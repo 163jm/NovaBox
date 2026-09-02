@@ -95,9 +95,9 @@ public class OpenListBrowseActivity extends BaseActivity {
             if (item != null) open(item);
         });
 
-        // 回到首页：清空返回栈，直接跳回 HomeActivity
+        // 回到首页：清空返回栈，直接跳回主容器
         tvGoHome.setOnClickListener(v -> {
-            Intent intent = new Intent(mContext, HomeActivity.class);
+            Intent intent = new Intent(mContext, MainActivity.class);
             intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
             startActivity(intent);
             finish();

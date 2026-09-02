@@ -1,7 +1,6 @@
 package com.mobile.novabox.ui.widget;
 
 import android.content.Context;
-import android.content.Intent;
 import android.content.res.TypedArray;
 import android.util.AttributeSet;
 import android.widget.FrameLayout;
@@ -9,27 +8,27 @@ import android.widget.ImageView;
 import android.widget.TextView;
 
 import com.mobile.novabox.R;
-import com.mobile.novabox.ui.activity.HomeActivity;
-import com.mobile.novabox.ui.activity.LivePlayActivity;
-import com.mobile.novabox.ui.activity.MyActivity;
 
 /**
- * 首页 / 直播 / 我的 三个页面共用的主导航栏。
+ * 首页 / 直播 / 我的 三个 Tab 共用的主导航栏。
  *
- * 结构:本组件只负责选中态与点击路由;具体样式(手机版底部横条 /
+ * 结构:本组件只负责选中态高亮与点击事件上报;具体样式(手机版底部横条 /
  * 平板 sw600dp 左侧竖栏)由 view_main_nav_bar 的布局限定符各留一份,
  * 页面布局里不再重复手写导航栏。
  *
- * 用法:
+ * 用法(容器 MainActivity 持有本组件并接管路由):
  * <pre>
  * &lt;com.mobile.novabox.ui.widget.MainNavBar
  *     android:id="@+id/bottomNavLayout"
  *     app:navSelected="home|live|my" ... /&gt;
+ *
+ * navBar.setOnTabSelectListener(tab -&gt; switchToTab(tab));
+ * navBar.setOnTabReselectListener(() -&gt; ...);   // 再次点击当前 tab
+ * navBar.setSelectedTab(tab);                    // 容器切换后同步高亮
  * </pre>
  *
- * 点击路由在组件内部统一处理:跳转目标页,栈内已存在时用
- * CLEAR_TOP|SINGLE_TOP 复用并清掉其上的页面;再次点击当前已选中的
- * tab 时回调 {@link #setOnTabReselectListener}(如首页滚回顶部)。
+ * 点击不直接 startActivity:由容器在同一 Activity 内切换 Fragment,
+ * 从而做到"导航栏纹丝不动,只有内容区切换动画"。
  */
 public class MainNavBar extends FrameLayout {
     public static final int TAB_HOME = 0;
@@ -42,6 +41,12 @@ public class MainNavBar extends FrameLayout {
 
     private int selectedTab = TAB_HOME;
     private Runnable reselectListener;
+    private OnTabSelectListener tabSelectListener;
+
+    /** Tab 点击(与当前选中项不同时)回调,由容器执行实际的 Tab 切换 */
+    public interface OnTabSelectListener {
+        void onTabSelect(int tab);
+    }
 
     public MainNavBar(Context context) {
         this(context, null);
@@ -64,6 +69,11 @@ public class MainNavBar extends FrameLayout {
         wireClicks();
     }
 
+    /** Tab 点击回调(容器接管路由) */
+    public void setOnTabSelectListener(OnTabSelectListener listener) {
+        this.tabSelectListener = listener;
+    }
+
     /** 再次点击"当前已选中"的 tab 时回调(例如首页滚回顶部);不需要可不设置 */
     public void setOnTabReselectListener(Runnable listener) {
         this.reselectListener = listener;
@@ -71,6 +81,13 @@ public class MainNavBar extends FrameLayout {
 
     public int getSelectedTab() {
         return selectedTab;
+    }
+
+    /** 容器完成 Tab 切换后调用,同步高亮(不改路由状态) */
+    public void setSelectedTab(int tab) {
+        if (tab < TAB_HOME || tab > TAB_MY) return;
+        this.selectedTab = tab;
+        applySelection();
     }
 
     private void wireClicks() {
@@ -84,18 +101,9 @@ public class MainNavBar extends FrameLayout {
             if (reselectListener != null) reselectListener.run();
             return;
         }
-        Class<?> target;
-        if (tab == TAB_LIVE) {
-            target = LivePlayActivity.class;
-        } else if (tab == TAB_MY) {
-            target = MyActivity.class;
-        } else {
-            target = HomeActivity.class;
+        if (tabSelectListener != null) {
+            tabSelectListener.onTabSelect(tab);
         }
-        Intent intent = new Intent(getContext(), target);
-        // 栈内已有目标页时复用并清掉其上的页面(等效原直播页 finish+CLEAR_TOP 的行为)
-        intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
-        getContext().startActivity(intent);
     }
 
     private void applySelection() {

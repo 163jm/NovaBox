@@ -1,27 +1,35 @@
-package com.mobile.novabox.ui.activity;
+package com.mobile.novabox.ui.fragment;
 
 import android.content.Intent;
-import android.view.View;
 
 import com.mobile.novabox.R;
-import com.mobile.novabox.base.BaseActivity;
+import com.mobile.novabox.base.BaseLazyFragment;
 import com.mobile.novabox.ui.dialog.AboutDialog;
 import com.mobile.novabox.ui.dialog.BackupDialog;
 import com.mobile.novabox.util.FastClickCheckUtil;
 import com.mobile.novabox.util.OpenListApi;
+import com.mobile.novabox.ui.activity.DownloadActivity;
+import com.mobile.novabox.ui.activity.LocalAudioActivity;
+import com.mobile.novabox.ui.activity.LocalVideoActivity;
+import com.mobile.novabox.ui.activity.OpenListBrowseActivity;
+import com.mobile.novabox.ui.activity.OpenListLoginActivity;
+import com.mobile.novabox.ui.activity.SettingActivity;
+
+import android.view.View;
 
 /**
- * 我的页面：收纳 OpenList 网盘、本地视频、本地音乐、设置 等功能入口。
+ * "我的"页面：收纳 OpenList 网盘、本地视频、本地音乐、设置 等功能入口。
+ * 由容器 MainActivity 以 Tab 形式承载(原 MyActivity 转换而来)。
  */
-public class MyActivity extends BaseActivity {
+public class MyFragment extends BaseLazyFragment {
 
     // 当前正在显示的备份弹窗；用于把 SAF 文件/目录选择器的 onActivityResult 转发给它。
-    // Dialog 无法自己接收 startActivityForResult 的结果，必须由宿主 Activity 转发。
+    // Dialog 无法自己接收 startActivityForResult 的结果，必须由宿主转发。
     private BackupDialog activeBackupDialog;
 
     @Override
     protected int getLayoutResID() {
-        return R.layout.activity_my;
+        return R.layout.fragment_my;
     }
 
     @Override
@@ -84,7 +92,7 @@ public class MyActivity extends BaseActivity {
         if (btnBackup != null) {
             btnBackup.setOnClickListener(v -> {
                 FastClickCheckUtil.check(v);
-                BackupDialog dialog = new BackupDialog(this);
+                BackupDialog dialog = new BackupDialog(mActivity);
                 activeBackupDialog = dialog;
                 dialog.setOnDismissListener(d -> {
                     if (activeBackupDialog == dialog) {
@@ -100,18 +108,17 @@ public class MyActivity extends BaseActivity {
         if (btnAbout != null) {
             btnAbout.setOnClickListener(v -> {
                 FastClickCheckUtil.check(v);
-                AboutDialog dialog = new AboutDialog(this);
+                AboutDialog dialog = new AboutDialog(mActivity);
                 dialog.show();
             });
         }
-
-        // 底部/左侧导航由公共组件 MainNavBar 处理(app:navSelected="my"),页面无需再接
     }
 
     @Override
-    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+    public void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-        // 转发给正在显示的备份弹窗，处理 SAF 目录/文件选择器的返回结果
+        // 由容器 MainActivity 转发而来:转发给正在显示的备份弹窗，
+        // 处理 SAF 目录/文件选择器的返回结果
         if (activeBackupDialog != null) {
             activeBackupDialog.onActivityResult(requestCode, resultCode, data);
         }

@@ -1,5 +1,6 @@
 package com.mobile.novabox.ui.activity;
 
+import android.content.Intent;
 import android.os.Bundle;
 import android.os.Handler;
 import android.view.KeyEvent;
@@ -107,20 +108,29 @@ public class SettingActivity extends BaseActivity {
     public void onBackPressed() {
         if (currentApi.equals(Hawk.get(HawkConfig.API_URL, ""))) {
             if ((homeSourceKey != null && !homeSourceKey.equals(Hawk.get(HawkConfig.HOME_API, "")))  || homeRec != Hawk.get(HawkConfig.HOME_REC, 0)) {
-                jumpActivity(HomeActivity.class, createBundle());
+                // 主容器:回首页 Tab,首页按缓存重载
+                Intent intent = new Intent(mContext, MainActivity.class);
+                intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+                intent.putExtras(createTabBundle(true));
+                startActivity(intent);
             }else if(!currentLiveApi.equals(Hawk.get(HawkConfig.LIVE_API_URL, ""))){
-                jumpActivity(HomeActivity.class);
+                Intent intent = new Intent(mContext, MainActivity.class);
+                intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+                intent.putExtras(createTabBundle(false));
+                startActivity(intent);
             }
         } else {
             AppManager.getInstance().finishAllActivity();
-            jumpActivity(HomeActivity.class);
+            jumpActivity(MainActivity.class);
         }
         super.onBackPressed();
     }
 
-    private Bundle createBundle() {
+    /** 跳回主容器:落到首页 Tab;useCache=true 表示首页按缓存重载 */
+    private Bundle createTabBundle(boolean useCache) {
         Bundle bundle = new Bundle();
-        bundle.putBoolean("useCache", true);
+        bundle.putInt("tab", MainActivity.TAB_HOME);
+        bundle.putBoolean("useCache", useCache);
         return bundle;
     }
 }

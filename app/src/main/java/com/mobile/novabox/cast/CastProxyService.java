@@ -21,7 +21,7 @@ import com.mobile.novabox.R;
 import com.mobile.novabox.dlna.CastDevice;
 import com.mobile.novabox.dlna.DLNACastService;
 import com.mobile.novabox.server.ControlManager;
-import com.mobile.novabox.ui.activity.HomeActivity;
+import com.mobile.novabox.ui.activity.MainActivity;
 import com.mobile.novabox.util.LOG;
 
 import org.fourthline.cling.android.AndroidUpnpService;
@@ -268,7 +268,7 @@ public class CastProxyService extends Service {
             content = content + "\n" + extraLine;
         }
 
-        Intent openIntent = new Intent(this, HomeActivity.class);
+        Intent openIntent = new Intent(this, MainActivity.class);
         openIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
         int piFlags = PendingIntent.FLAG_UPDATE_CURRENT;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {

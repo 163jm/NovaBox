@@ -281,6 +281,13 @@ public abstract class BaseLazyFragment extends Fragment implements CustomAdapt {
         }
     }
 
+    protected boolean isLoading() {
+        if (mLoadService != null && mLoadService.getCurrentCallback() != null) {
+            return mLoadService.getCurrentCallback().equals(LoadingCallback.class);
+        }
+        return false;
+    }
+
     public void jumpActivity(Class<? extends BaseActivity> clazz) {
         Intent intent = new Intent(mContext, clazz);
         startActivity(intent);

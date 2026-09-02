@@ -1,24 +1,20 @@
-package com.mobile.novabox.ui.activity;
+package com.mobile.novabox.ui.fragment;
 
 import android.Manifest;
 import android.annotation.SuppressLint;
 import android.content.Context;
+import android.content.res.Configuration;
 import android.graphics.Bitmap;
 import android.net.Uri;
 import android.os.CountDownTimer;
 import android.os.Handler;
 import android.text.TextUtils;
 import android.util.Base64;
-import android.view.KeyEvent;
 import android.view.View;
-import android.view.ViewGroup;
-import android.widget.FrameLayout;
 import android.widget.ImageView;
-import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import androidx.annotation.NonNull;
 import androidx.core.content.ContextCompat;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -28,18 +24,20 @@ import com.github.catvod.crawler.Spider;
 import com.mobile.novabox.R;
 import com.mobile.novabox.api.ApiConfig;
 import com.mobile.novabox.base.App;
-import com.mobile.novabox.base.BaseActivity;
+import com.mobile.novabox.base.BaseLazyFragment;
 import com.mobile.novabox.bean.LiveChannelGroup;
 import com.mobile.novabox.bean.LiveChannelItem;
 import com.mobile.novabox.bean.LivePlayerManager;
 import com.mobile.novabox.bean.LiveSettingGroup;
 import com.mobile.novabox.bean.LiveSettingItem;
 import com.mobile.novabox.player.controller.LiveController;
+import com.mobile.novabox.ui.activity.MainActivity;
 import com.mobile.novabox.ui.adapter.LiveChannelGroupAdapter;
 import com.mobile.novabox.ui.adapter.LiveChannelItemAdapter;
 import com.mobile.novabox.ui.adapter.LiveSettingGroupAdapter;
 import com.mobile.novabox.ui.adapter.LiveSettingItemAdapter;
 import com.mobile.novabox.ui.dialog.LivePasswordDialog;
+import com.mobile.novabox.ui.widget.MainNavBar;
 import com.mobile.novabox.util.DefaultConfig;
 import com.mobile.novabox.util.FastClickCheckUtil;
 import com.mobile.novabox.util.HawkConfig;
@@ -57,8 +55,6 @@ import com.lzy.okgo.OkGo;
 import com.lzy.okgo.callback.AbsCallback;
 import com.lzy.okgo.model.Response;
 import com.orhanobut.hawk.Hawk;
-import androidx.recyclerview.widget.RecyclerView;
-import androidx.recyclerview.widget.LinearLayoutManager;
 import com.squareup.picasso.Picasso;
 
 import org.json.JSONArray;
@@ -104,11 +100,11 @@ import xyz.doikki.videoplayer.player.AbstractPlayer;
 import xyz.doikki.videoplayer.player.VideoView;
 
 /**
- * @author pj567
- * @date :2021/1/12
- * @description:
+ * 直播内容 Fragment(原 LivePlayActivity 转换而来)。
+ * 由容器 MainActivity 以 Tab 形式承载:切走时暂停播放、切回继续,状态保留。
+ * 全屏/沉浸式相关的窗口操作通过宿主 MainActivity 完成。
  */
-public class LivePlayActivity extends BaseActivity {
+public class LiveFragment extends BaseLazyFragment {
     public static Context context;
     private VideoView<xyz.doikki.videoplayer.player.AbstractPlayer> mVideoView;
     private View switchChannelSnapshotOverlay;
@@ -132,7 +128,6 @@ public class LivePlayActivity extends BaseActivity {
     private Handler mHandler = new Handler();
     private int resolutionInfoRetryCount = 0;
     private boolean resolutionInfoPending = false;
-    private boolean exitingLivePlay = false;
     // Pad 端横屏始终是横屏，用此标记区分"全屏模式"与"正常浏览模式"
     private boolean mIsPadFullscreen = false;
     // 竖屏/传感器策略下"不旋转全屏"标记
@@ -191,12 +186,12 @@ public class LivePlayActivity extends BaseActivity {
 
     @Override
     protected int getLayoutResID() {
-        return R.layout.activity_live_play;
+        return R.layout.fragment_live;
     }
 
     @Override
     protected void init() {
-        context = this;
+        context = mActivity;
 
         setLoadSir(findViewById(R.id.live_channel_area));
         mVideoView = findViewById(R.id.mVideoView);
@@ -231,7 +226,6 @@ public class LivePlayActivity extends BaseActivity {
         Hawk.put(HawkConfig.PLAYER_IS_LIVE,true);
     }
     // 切台后短暂显示右上角"频道名+加载圈"悬浮条，几秒后自动隐藏
-    // （原 showBottomEpg：TV 版底部 EPG 节目预告条已随不可见面板一起移除，此处只保留手机端真正可见的右上角悬浮条逻辑）
     @SuppressLint("SetTextI18n")
     private void updateRightTopChannelInfo() {
         if (isSHIYI || channel_Name == null || channel_Name.getChannelName() == null) {
@@ -254,82 +248,51 @@ public class LivePlayActivity extends BaseActivity {
         tv_right_top_epg_name.setText(channel_Name.getChannelName());
     }
 
-    @Override
-    public void onBackPressed() {
-        // Pad 端：横屏全屏模式下返回 = 退出全屏；非全屏直接走下面普通逻辑
-        if (com.mobile.novabox.util.PadUiHelper.isPad(this) && isLandscape()) {
+    /**
+     * 返回键处理(由容器 MainActivity 调用)。
+     * @return true 表示已消费(退出全屏/关浮层/回上一源等);
+     *         false 表示切换回首页 Tab。
+     */
+    public boolean handleBack() {
+        // Pad 端：横屏全屏模式下返回 = 退出全屏；非全屏走下面普通逻辑
+        if (com.mobile.novabox.util.PadUiHelper.isPad(mActivity) && isLandscape()) {
             if (mIsPadFullscreen) {
                 exitFullscreenMode();
-                return;
+                return true;
             }
-            // 非全屏，直接退出直播页回首页
-        } else if (!com.mobile.novabox.util.PadUiHelper.isPad(this) && (isLandscape() || mIsPortraitFullscreen)) {
+            // 非全屏，回首页 Tab
+        } else if (!com.mobile.novabox.util.PadUiHelper.isPad(mActivity) && (isLandscape() || mIsPortraitFullscreen)) {
             exitFullscreenMode();
-            return;
+            return true;
         }
         // 关闭设置弹窗
         if (liveSettingsDialogOverlay != null && liveSettingsDialogOverlay.getVisibility() == View.VISIBLE) {
             hideMobileSettingsDialog();
-            return;
+            return true;
         }
         // 关闭控制浮层
         if (liveControlOverlay != null && liveControlOverlay.getVisibility() == View.VISIBLE) {
             hideControlOverlay();
-            return;
+            return true;
         }
         if(isBack){
             isBack= false;
             playPreSource();
-        }else {
-            mHandler.removeCallbacks(mConnectTimeoutChangeSourceRun);
-            mHandler.removeCallbacks(mUpdateNetSpeedRun);
-            exitingLivePlay = true;
-            super.onBackPressed();
+            return true;
         }
+        mHandler.removeCallbacks(mConnectTimeoutChangeSourceRun);
+        mHandler.removeCallbacks(mUpdateNetSpeedRun);
+        return false;
     }
 
+    /** Fragment 真正 Resume(容器 Tab 切回/应用回前台):恢复播放,横屏全屏时重申沉浸式 */
     @Override
-    public boolean onKeyDown(int keyCode, KeyEvent event) {
-        // 全屏时直接在 onKeyDown 拦截返回键，绕过国产系统"再次滑动返回"确认层
-        if (keyCode == KeyEvent.KEYCODE_BACK && (isLandscape() || mIsPortraitFullscreen)) {
-            boolean isPad = com.mobile.novabox.util.PadUiHelper.isPad(this);
-            if (!isPad || mIsPadFullscreen) {
-                // 手机横屏 或 pad真正全屏：退出全屏
-                exitFullscreenMode();
-                return true;
-            }
-            // pad非全屏横屏：让onBackPressed处理（走正常返回）
-        }
-        return super.onKeyDown(keyCode, event);
-    }
-
-    @Override
-    protected void applyStatusBarPadding() {
-        // 直播页竖屏时给主内容加状态栏顶部 padding，避免与状态栏重叠
-        // 横屏全屏时不加（enterFullscreenMode 会清除）
-        // Pad 端横屏布局已全屏，无需底部 padding（无底部导航栏）
-        View mainLayout = findViewById(R.id.live_main_content);
-        if (mainLayout != null) {
-            boolean isPad = com.mobile.novabox.util.PadUiHelper.isPad(this);
-            if (isPad) {
-                // Pad 横屏：顶部留状态栏高度，底部不加（无底部导航栏，内容全屏）
-                int statusBarHeight = getStatusBarHeight();
-                mainLayout.setPadding(0, statusBarHeight, 0, 0);
-            } else {
-                int statusBarHeight = getStatusBarHeight();
-                mainLayout.setPadding(0, statusBarHeight, 0, (int)(60 * getResources().getDisplayMetrics().density));
-            }
-        }
-    }
-
-    @Override
-    protected void onResume() {
-        super.onResume();
+    protected void onFragmentResume() {
         // 横屏全屏时重新应用沉浸式UI（pad非全屏不应用）
         boolean shouldImmersive = isLandscape() &&
-            (!com.mobile.novabox.util.PadUiHelper.isPad(this) || mIsPadFullscreen);
+            (!com.mobile.novabox.util.PadUiHelper.isPad(mActivity) || mIsPadFullscreen);
         if (shouldImmersive) {
-            getWindow().getDecorView().setSystemUiVisibility(
+            mActivity.getWindow().getDecorView().setSystemUiVisibility(
                 View.SYSTEM_UI_FLAG_FULLSCREEN
                 | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
                 | View.SYSTEM_UI_FLAG_IMMERSIVE
@@ -337,24 +300,21 @@ public class LivePlayActivity extends BaseActivity {
                 | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
             );
         }
-        exitingLivePlay = false;
         if (mVideoView != null) {
             mVideoView.resume();
         }
     }
 
-
+    /** Fragment 真正 Pause(容器 Tab 切走/应用退后台):暂停播放 */
     @Override
-    protected void onPause() {
-        super.onPause();
-        if (mVideoView != null && !exitingLivePlay) {
+    protected void onFragmentPause() {
+        if (mVideoView != null) {
             mVideoView.pause();
         }
     }
 
     @Override
-    protected void onDestroy() {
-        super.onDestroy();
+    public void onDestroy() {
         Hawk.put(HawkConfig.PLAYER_IS_LIVE, false);
         hideSwitchChannelSnapshot();
         if (controlOverlayTimer != null) controlOverlayTimer.cancel();
@@ -364,11 +324,11 @@ public class LivePlayActivity extends BaseActivity {
         }
         mHandler.removeCallbacks(mUpdateResolutionInfoRun);
         mHandler.removeCallbacks(mHideResolutionInfoRun);
+        super.onDestroy();
     }
 
-    @Override
-    public void onConfigurationChanged(android.content.res.Configuration newConfig) {
-        super.onConfigurationChanged(newConfig);
+    /** 旋转回调(容器 onConfigurationChanged 转发) */
+    public void onOrientationChanged(Configuration newConfig) {
         if (newConfig.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE) {
             // 旋转到横屏：进入全屏，同时清除竖屏全屏标记（横屏全屏接管）
             mIsPortraitFullscreen = false;
@@ -392,20 +352,21 @@ public class LivePlayActivity extends BaseActivity {
         // 注意：不在此处清除 mIsPortraitFullscreen，由调用方负责设置，
         // 否则竖屏全屏点击全屏按钮后标记被错误清除，返回键无法退出全屏。
         // 沉浸式全屏（手机/Pad通用）
-        getWindow().getDecorView().setSystemUiVisibility(
+        mActivity.getWindow().getDecorView().setSystemUiVisibility(
             View.SYSTEM_UI_FLAG_FULLSCREEN
             | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
             | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
             | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
             | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
         );
-        // 隐藏信息栏、频道列表外层容器（wrapper）和左侧/底部导航栏
+        // 隐藏信息栏、频道列表外层容器（wrapper）和容器层的导航栏
         View infoBar = findViewById(R.id.live_info_bar);
         View channelAreaWrapper = findViewById(R.id.live_channel_area_wrapper);
-        View bottomNav = findViewById(R.id.live_bottom_nav);
         if (infoBar != null) infoBar.setVisibility(View.GONE);
         if (channelAreaWrapper != null) channelAreaWrapper.setVisibility(View.GONE);
-        if (bottomNav != null) bottomNav.setVisibility(View.GONE);
+        ((MainActivity) mActivity).setNavVisible(false);
+        // 清除窗口层的状态栏 padding(全屏)
+        ((MainActivity) mActivity).setContentPaddingEnabled(false);
         // 播放容器撑满：手机竖向LL中用 weight=0 + height=MATCH_PARENT 独占空间
         View playerContainer = findViewById(R.id.live_player_container);
         if (playerContainer != null) {
@@ -436,7 +397,7 @@ public class LivePlayActivity extends BaseActivity {
     private void exitFullscreenMode() {
         mIsPadFullscreen = false;
         mIsPortraitFullscreen = false;
-        // 恢复系统UI：用与 applyStatusBarPadding 一致的 flags，
+        // 恢复系统UI：用与常规状态一致的 flags，
         // 而不是 SYSTEM_UI_FLAG_VISIBLE（VISIBLE=0 会清掉 LAYOUT_FULLSCREEN 等标志，
         // 导致退出全屏后状态栏图标/时间消失或显示异常）
         int uiFlags = View.SYSTEM_UI_FLAG_LAYOUT_STABLE
@@ -444,23 +405,22 @@ public class LivePlayActivity extends BaseActivity {
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
             uiFlags |= View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
         }
-        getWindow().getDecorView().setSystemUiVisibility(uiFlags);
-        // 同时恢复 BaseActivity 在 android.R.id.content 上设置的顶部 padding
-        restoreStatusBarPadding();
-        // 显示信息栏、频道列表外层容器和左侧/底部导航栏
+        mActivity.getWindow().getDecorView().setSystemUiVisibility(uiFlags);
+        // 恢复窗口层的状态栏 padding + 显示容器层导航栏
+        ((MainActivity) mActivity).setContentPaddingEnabled(true);
+        ((MainActivity) mActivity).setNavVisible(true);
+        // 显示信息栏、频道列表外层容器
         View infoBar = findViewById(R.id.live_info_bar);
         View channelAreaWrapper = findViewById(R.id.live_channel_area_wrapper);
-        View bottomNav = findViewById(R.id.live_bottom_nav);
         if (infoBar != null) infoBar.setVisibility(View.VISIBLE);
         if (channelAreaWrapper != null) channelAreaWrapper.setVisibility(View.VISIBLE);
-        if (bottomNav != null) bottomNav.setVisibility(View.VISIBLE);
         // 播放容器恢复原始尺寸
         View playerContainer = findViewById(R.id.live_player_container);
         if (playerContainer != null) {
             android.widget.LinearLayout.LayoutParams lp =
                 (android.widget.LinearLayout.LayoutParams) playerContainer.getLayoutParams();
             // Pad横向LL：width=0,weight=72；手机竖向LL：width=MATCH_PARENT,height=0,weight=2
-            if (com.mobile.novabox.util.PadUiHelper.isPad(this)) {
+            if (com.mobile.novabox.util.PadUiHelper.isPad(mActivity)) {
                 lp.weight = 72;
                 lp.width = 0;
                 lp.height = android.view.ViewGroup.LayoutParams.MATCH_PARENT;
@@ -472,17 +432,6 @@ public class LivePlayActivity extends BaseActivity {
             playerContainer.setLayoutParams(lp);
             playerContainer.requestLayout();
         }
-        // 恢复主布局顶部(statusBar) padding，手机竖屏还需恢复底部 60dp 避免被底部导航栏遮挡
-        View mainLayout = findViewById(R.id.live_main_content);
-        if (mainLayout != null) {
-            int statusBarPx = getStatusBarHeight();
-            if (com.mobile.novabox.util.PadUiHelper.isPad(this)) {
-                mainLayout.setPadding(0, statusBarPx, 0, 0);
-            } else {
-                int bottomPad = (int)(60 * getResources().getDisplayMetrics().density);
-                mainLayout.setPadding(0, statusBarPx, 0, bottomPad);
-            }
-        }
         // VideoView 重新布局后刷新画面，避免退出全屏后黑屏
         if (mVideoView != null) {
             mVideoView.requestLayout();
@@ -492,17 +441,15 @@ public class LivePlayActivity extends BaseActivity {
             ivFullscreenBtn.setImageResource(R.drawable.icon_fullscreen);
         }
         // 退出全屏后恢复到设备默认方向（Pad=横屏，手机=竖屏）
-        enforceOrientationForDevice();
+        ((MainActivity) mActivity).enforceDeviceOrientation();
     }
 
-    @Override
-    public void onWindowFocusChanged(boolean hasFocus) {
-        super.onWindowFocusChanged(hasFocus);
-        // 窗口重新获焦时（如通知栏收起后），若仍在横屏全屏则重新应用沉浸式（pad非全屏跳过）
+    /** 窗口重新获焦(容器转发):横屏全屏时重申沉浸式(pad非全屏跳过) */
+    public void onWindowFocusChangedCompat(boolean hasFocus) {
         boolean shouldImmersive = hasFocus && isLandscape() &&
-            (!com.mobile.novabox.util.PadUiHelper.isPad(this) || mIsPadFullscreen);
+            (!com.mobile.novabox.util.PadUiHelper.isPad(mActivity) || mIsPadFullscreen);
         if (shouldImmersive) {
-            getWindow().getDecorView().setSystemUiVisibility(
+            mActivity.getWindow().getDecorView().setSystemUiVisibility(
                 View.SYSTEM_UI_FLAG_FULLSCREEN
                 | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
                 | View.SYSTEM_UI_FLAG_IMMERSIVE
@@ -548,7 +495,6 @@ public class LivePlayActivity extends BaseActivity {
 
             }else if(livesOBJ.has("api")){
                 py_jar=livesOBJ.has("api")?livesOBJ.get("api").getAsString():"";
-//                String ext = livesOBJ.has("ext")?livesOBJ.get("ext").getAsJsonObject().toString():"";
                 String ext="";
                 if(livesOBJ.has("ext") && (livesOBJ.get("ext").isJsonObject() || livesOBJ.get("ext").isJsonArray())){
                     ext=livesOBJ.get("ext").toString();
@@ -714,7 +660,7 @@ public class LivePlayActivity extends BaseActivity {
 
 
     private void initVideoView() {
-        LiveController controller = new LiveController(this);
+        LiveController controller = new LiveController(mActivity);
         controller.setListener(new LiveController.LiveControlListener() {
             @Override
             public boolean singleTap() {
@@ -892,9 +838,6 @@ public class LivePlayActivity extends BaseActivity {
         liveSettingGroupAdapter = new LiveSettingGroupAdapter();
         mSettingGroupView.setAdapter(liveSettingGroupAdapter);
 
-        //电视
-// phone: TV item listener removed - use adapter click callbacks
-
         //手机/模拟器
         liveSettingGroupAdapter.setOnItemClickListener(new BaseQuickAdapter.OnItemClickListener() {
             @Override
@@ -951,9 +894,6 @@ public class LivePlayActivity extends BaseActivity {
         liveSettingItemAdapter = new LiveSettingItemAdapter();
         mSettingItemView.setAdapter(liveSettingItemAdapter);
 
-        //电视
-// phone: TV item listener removed - use adapter click callbacks
-
         //手机/模拟器
         liveSettingItemAdapter.setOnItemClickListener(new BaseQuickAdapter.OnItemClickListener() {
             @Override
@@ -998,8 +938,7 @@ public class LivePlayActivity extends BaseActivity {
             }
         });
 
-        // 底部/左侧导航由公共组件 MainNavBar 处理(app:navSelected="live"),
-        // 显隐控制见 live_bottom_nav 的全屏切换逻辑
+        // 底部/左侧导航栏在容器 MainActivity 层;全屏显隐经 setNavVisible 控制
 
         tvSettingsClose.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -1042,7 +981,8 @@ public class LivePlayActivity extends BaseActivity {
                     // 全屏时（横屏或竖屏全屏）退出全屏
                     exitFullscreenMode();
                 } else {
-                    finish();
+                    // 等效原 finish():回到首页 Tab
+                    ((MainActivity) mActivity).switchToTab(MainNavBar.TAB_HOME, true);
                 }
             }
         });
@@ -1060,7 +1000,7 @@ public class LivePlayActivity extends BaseActivity {
         ivFullscreenBtn.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                boolean isPad = com.mobile.novabox.util.PadUiHelper.isPad(LivePlayActivity.this);
+                boolean isPad = com.mobile.novabox.util.PadUiHelper.isPad(mActivity);
                 // 已在全屏：点击退出全屏
                 // 平板：需要 mIsPadFullscreen=true 才算全屏（平板常态就是横屏，不能单靠 isLandscape 判断）
                 // 手机：isLandscape 或 mIsPortraitFullscreen 即为全屏
@@ -1085,10 +1025,10 @@ public class LivePlayActivity extends BaseActivity {
                         // 传感器策略：先直接展开全屏UI，再解锁传感器
                         mIsPortraitFullscreen = true;
                         enterFullscreenMode();
-                        setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR);
+                        mActivity.setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR);
                     } else {
-                        // 横屏/自动策略：旋转横屏，等 onConfigurationChanged 触发 enterFullscreenMode
-                        setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
+                        // 横屏/自动策略：旋转横屏，等 onOrientationChanged 触发 enterFullscreenMode
+                        mActivity.setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
                     }
                 }
                 hideControlOverlay();
@@ -1182,9 +1122,7 @@ public class LivePlayActivity extends BaseActivity {
                     lp.width = (int) (320 * density);
                 }
                 dialogContent.setLayoutParams(lp);
-                // 调整列表区高度:容纳 6 个分组项 + 6 个选项(画面比例/播放解码/超时换源/
-                // 偏好设置/多源切换 等),每项 ~45dp,合计 ~290dp;加 30dp 余量 = 320dp。
-                // 之前给的 540dp 太大了,有 200+dp 空白。
+                // 调整列表区高度:容纳 6 个分组项 + 6 个选项,每项 ~45dp,合计 ~290dp;加 30dp 余量 = 320dp。
                 View listArea = dialogContent.getChildAt(2); // 分割线下方的列表LinearLayout
                 if (listArea != null) {
                     android.view.ViewGroup.LayoutParams llp = listArea.getLayoutParams();
@@ -1355,12 +1293,12 @@ public class LivePlayActivity extends BaseActivity {
                         mHandler.post(() -> {
                             if (mVideoView != null) mVideoView.release();
                             setEmptyLiveChannelList(false);
-                            Toast.makeText(LivePlayActivity.this, msg, Toast.LENGTH_SHORT).show();
+                            Toast.makeText(mActivity, msg, Toast.LENGTH_SHORT).show();
                         });
                     }
                     @Override
                     public void notice(String msg) {
-                        mHandler.post(() -> Toast.makeText(LivePlayActivity.this, msg, Toast.LENGTH_SHORT).show());
+                        mHandler.post(() -> Toast.makeText(mActivity, msg, Toast.LENGTH_SHORT).show());
                     }
                 });
                 // 多源切换：立即关闭弹窗
@@ -1469,13 +1407,13 @@ public class LivePlayActivity extends BaseActivity {
                     mHandler.post(() -> {
                         setEmptyLiveChannelList(false);
                         if (msg != null && !msg.equals("-1")) {
-                            Toast.makeText(LivePlayActivity.this, msg, Toast.LENGTH_SHORT).show();
+                            Toast.makeText(mActivity, msg, Toast.LENGTH_SHORT).show();
                         }
                     });
                 }
                 @Override
                 public void notice(String msg) {
-                    mHandler.post(() -> Toast.makeText(LivePlayActivity.this, msg, Toast.LENGTH_SHORT).show());
+                    mHandler.post(() -> Toast.makeText(mActivity, msg, Toast.LENGTH_SHORT).show());
                 }
             });
             return;
@@ -1512,7 +1450,7 @@ public class LivePlayActivity extends BaseActivity {
         LOG.i("echo-live-url:"+url);
 
         if(url.contains(".py") || url.contains(".js")){
-            if ((url.contains(".py") || url.contains(".js")) && !hasPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE)) {
+            if ((url.contains(".py") || url.contains(".js")) && !mActivity.hasPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE)) {
                 // 权限不足时，直接设置默认播放列表
                 Toast.makeText(App.getInstance(), "该源需要存储权限", Toast.LENGTH_SHORT).show();
                 setEmptyLiveChannelList();
@@ -1528,7 +1466,6 @@ public class LivePlayActivity extends BaseActivity {
                         public String call() {
                             Spider sp = ApiConfig.get().getLiveCSP(finalUrl);
                             String json=sp.liveContent(finalUrl);
-//                            LOG.i("echo--loadProxyLives-json--"+json);
                             return json;
                         }
                     });
@@ -1570,7 +1507,7 @@ public class LivePlayActivity extends BaseActivity {
                         mHandler.post(new Runnable() {
                             @Override
                             public void run() {
-                                LivePlayActivity.this.showSuccess();
+                                LiveFragment.this.showSuccess();
                                 initLiveState();
                             }
                         });
@@ -1613,7 +1550,7 @@ public class LivePlayActivity extends BaseActivity {
                     mHandler.post(new Runnable() {
                         @Override
                         public void run() {
-                            LivePlayActivity.this.showSuccess();
+                            LiveFragment.this.showSuccess();
                             initLiveState();
                         }
                     });
@@ -1771,7 +1708,7 @@ public class LivePlayActivity extends BaseActivity {
         for (int i = 0; i < multiSettingItems.size(); i++) {
             LiveSettingItem item = multiSettingItems.get(i);
             if (item.getItemGroup() == 1) {
-                // 线路选择(lives)来源：仅在未启用独立直播源时按 live_group_index 标记
+                // 线路选择(lives)来源：仅在未启用独立直播源时按 live_group_index 匹配
                 item.setItemSelected(usingVodConfigLives && currentLiveGroupIndex == item.getItemSourceIndex());
             } else {
                 // 直播地址来源：按 LIVE_API_URL 标记
@@ -1891,7 +1828,6 @@ public class LivePlayActivity extends BaseActivity {
     };
 
     private void showNetSpeed() {
-//        tv_right_top_tipnetspeed.setVisibility(View.VISIBLE);
         if (Hawk.get(HawkConfig.LIVE_SHOW_NET_SPEED, false)) {
             mHandler.post(mUpdateNetSpeedRun);
             tvNetSpeed.setVisibility(View.VISIBLE);
@@ -1907,13 +1843,12 @@ public class LivePlayActivity extends BaseActivity {
             if (mVideoView == null) return;
             String speed = PlayerHelper.getDisplaySpeedBps(mVideoView.getTcpSpeed(), true);
             tvNetSpeed.setText(speed);
-//            tv_right_top_tipnetspeed.setText(speed);
             mHandler.postDelayed(this, 1000);
         }
     };
 
     private void showPasswordDialog(int groupIndex, int liveChannelIndex) {
-        LivePasswordDialog dialog = new LivePasswordDialog(this);
+        LivePasswordDialog dialog = new LivePasswordDialog(mActivity);
         dialog.setOnListener(new LivePasswordDialog.OnListener() {
             @Override
             public void onChange(String password) {
@@ -1980,7 +1915,7 @@ public class LivePlayActivity extends BaseActivity {
         int channelGroupIndex = currentChannelGroupIndex;
         int liveChannelIndex = currentLiveChannelIndex;
 
-        //跨选分组模式下跳过加密频道分组（遥控器上下键换台/超时换源）
+        //跨选分组模式下跳过加密频道分组（超时换源）
         if (direction > 0) {
             liveChannelIndex++;
             if (liveChannelIndex >= getLiveChannels(channelGroupIndex).size()) {
@@ -2040,7 +1975,7 @@ public class LivePlayActivity extends BaseActivity {
         mHandler.post(() -> {
             try {
                 // 通过 Toast 提示用户
-                Toast.makeText(this, "请先到【设置 → 直播地址】中添加并选中一个直播源", Toast.LENGTH_LONG).show();
+                Toast.makeText(mContext, "请先到【设置 → 直播地址】中添加并选中一个直播源", Toast.LENGTH_LONG).show();
             } catch (Exception ignored) {}
         });
         updateMobileChannelName("未配置直播源");
@@ -2085,6 +2020,5 @@ public class LivePlayActivity extends BaseActivity {
 
     private void setEmptyLiveChannelList(boolean releasePlayer) {
         clearLiveChannelList(releasePlayer);
-//        Toast.makeText(App.getInstance(), "源异常,请切换到其他源", Toast.LENGTH_SHORT).show();
     }
 }

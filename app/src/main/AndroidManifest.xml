@@ -39,24 +39,19 @@
             在运行时根据设备类型动态决定：
               · 平板 (sw >= 600dp)  → sensorLandscape
               · 手机               → portrait
-            PlayActivity 保留 sensorLandscape（播放器始终横屏）。
+            configChanges 保留:直播 Fragment 全屏旋转时不重建容器。
         -->
 
         <activity
-            android:name=".ui.activity.HomeActivity"
+            android:name=".ui.activity.MainActivity"
             android:exported="true"
-            android:screenOrientation="unspecified">
+            android:screenOrientation="unspecified"
+            android:configChanges="orientation|screenSize|keyboardHidden|smallestScreenSize|screenLayout">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-
-        <activity
-            android:name=".ui.activity.LivePlayActivity"
-            android:theme="@style/AppTheme.NoActionBar"
-            android:configChanges="orientation|screenSize"
-            android:screenOrientation="unspecified" />
 
         <activity
             android:name=".ui.activity.DetailActivity"
@@ -79,10 +74,6 @@
 
         <activity
             android:name=".ui.activity.SettingActivity"
-            android:screenOrientation="unspecified" />
-
-        <activity
-            android:name=".ui.activity.MyActivity"
             android:screenOrientation="unspecified" />
 
         <activity

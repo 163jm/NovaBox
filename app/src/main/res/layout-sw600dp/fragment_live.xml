@@ -1,10 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-    Pad 端直播页布局（sw600dp）- 修改版
-    布局结构：
-      - 最左侧：竖向导航栏（72dp宽），与首页保持一致
-      - 中间：播放器区域（约55%宽）
-      - 右侧：频道面板（约35%宽）
+    直播内容 Fragment(Pad sw600dp 版)。
+    左侧导航栏已上移到容器 MainActivity,此处只保留 播放器区 + 频道面板。
 -->
 <FrameLayout
     xmlns:tools="http://schemas.android.com/tools"
@@ -23,16 +20,7 @@
         android:orientation="horizontal">
 
         <!-- ══════════════════════════════
-             左侧:竖向导航栏,公共组件 MainNavBar(96dp宽)
-             ══════════════════════════════ -->
-        <com.mobile.novabox.ui.widget.MainNavBar
-            android:id="@+id/live_bottom_nav"
-            android:layout_width="96dp"
-            android:layout_height="match_parent"
-            app:navSelected="live" />
-
-        <!-- ══════════════════════════════
-             中间：播放器区域（占65%）
+             播放器区域（占72%）
              ══════════════════════════════ -->
         <FrameLayout
             android:id="@+id/live_player_container"
@@ -243,7 +231,6 @@
                         android:scrollbars="none" />
 
 
-
                     <!-- 频道列表（Pad端补充，与手机端一致） -->
                     <androidx.recyclerview.widget.RecyclerView
                         android:id="@+id/mChannelGridView"
@@ -253,7 +240,6 @@
                         android:background="@android:color/transparent"
                         android:padding="4dp"
                         android:scrollbars="none" />
-
 
 
                     <androidx.recyclerview.widget.RecyclerView

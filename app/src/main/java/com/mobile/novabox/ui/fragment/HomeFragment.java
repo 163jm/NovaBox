@@ -1,10 +1,8 @@
-package com.mobile.novabox.ui.activity;
+package com.mobile.novabox.ui.fragment;
 
 import android.Manifest;
-import android.animation.Animator;
-import android.animation.AnimatorSet;
-import android.animation.IntEvaluator;
-import android.animation.ObjectAnimator;
+import android.animation.AlphaAnimation;
+import android.animation.Animation;
 import android.annotation.SuppressLint;
 import android.app.ActivityManager;
 import android.content.Intent;
@@ -12,49 +10,35 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.view.KeyEvent;
 import android.view.View;
-import android.view.ViewGroup;
 import android.view.animation.AccelerateInterpolator;
-import android.view.animation.AlphaAnimation;
-import android.view.animation.Animation;
-import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
-import androidx.constraintlayout.widget.ConstraintLayout;
 import androidx.lifecycle.Observer;
 import androidx.lifecycle.ViewModelProvider;
 import androidx.recyclerview.widget.DiffUtil;
-import androidx.recyclerview.widget.RecyclerView;
-import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.LinearLayoutManager;
-import androidx.viewpager.widget.ViewPager;
+import androidx.recyclerview.widget.RecyclerView;
 
 import com.mobile.novabox.R;
 import com.mobile.novabox.api.ApiConfig;
-import com.mobile.novabox.base.BaseActivity;
 import com.mobile.novabox.base.BaseLazyFragment;
 import com.mobile.novabox.bean.AbsSortXml;
 import com.mobile.novabox.bean.MovieSort;
 import com.mobile.novabox.bean.SourceBean;
 import com.mobile.novabox.event.RefreshEvent;
-import com.mobile.novabox.server.ControlManager;
 import com.mobile.novabox.ui.activity.CollectActivity;
+import com.mobile.novabox.ui.activity.DetailActivity;
 import com.mobile.novabox.ui.activity.HistoryActivity;
-import com.mobile.novabox.ui.activity.LivePlayActivity;
+import com.mobile.novabox.ui.activity.MainActivity;
 import com.mobile.novabox.ui.activity.SearchActivity;
+import com.mobile.novabox.ui.activity.SettingActivity;
 import com.mobile.novabox.ui.adapter.HomePageAdapter;
-import com.mobile.novabox.ui.adapter.SelectDialogAdapter;
 import com.mobile.novabox.ui.adapter.SortAdapter;
-import com.mobile.novabox.ui.dialog.SelectDialog;
-import com.mobile.novabox.ui.dialog.TipDialog;
-import com.mobile.novabox.ui.fragment.GridFragment;
-import com.mobile.novabox.ui.fragment.UserFragment;
 import com.mobile.novabox.ui.tv.widget.DefaultTransformer;
 import com.mobile.novabox.ui.tv.widget.FixedSpeedScroller;
 import com.mobile.novabox.ui.tv.widget.NoScrollViewPager;
-import com.mobile.novabox.ui.widget.MainNavBar;
-import com.mobile.novabox.util.AppManager;
 import com.mobile.novabox.util.DefaultConfig;
 import com.mobile.novabox.util.FastClickCheckUtil;
 import com.mobile.novabox.util.HawkConfig;
@@ -65,17 +49,16 @@ import com.orhanobut.hawk.Hawk;
 import org.greenrobot.eventbus.EventBus;
 import org.greenrobot.eventbus.Subscribe;
 import org.greenrobot.eventbus.ThreadMode;
-import org.jetbrains.annotations.NotNull;
 
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.List;
 
-import me.jessyan.autosize.utils.AutoSizeUtils;
-
-public class HomeActivity extends BaseActivity {
-    private LinearLayout topLayout;
-    private LinearLayout contentLayout;
+/**
+ * 首页内容 Fragment(原 HomeActivity 转换而来)。
+ * 由容器 MainActivity 以 Tab 形式承载;底部/左侧导航栏在容器层。
+ */
+public class HomeFragment extends BaseLazyFragment {
     private TextView tvName;
     private RecyclerView mGridView;
     private NoScrollViewPager mViewPager;
@@ -84,21 +67,36 @@ public class HomeActivity extends BaseActivity {
     private HomePageAdapter pageAdapter;
     private View currentView;
     private final List<BaseLazyFragment> fragments = new ArrayList<>();
-    private boolean isDownOrUp = false;
     private boolean sortChange = false;
     private int currentSelected = 0;
     private int sortFocused = 0;
     public View sortFocusView = null;
     private final Handler mHandler = new Handler();
-    private long mExitTime = 0;
     private boolean eventBusRegistered = false;
+
+    boolean useCacheConfig = false;
 
     @Override
     protected int getLayoutResID() {
-        return R.layout.activity_home;
+        return R.layout.fragment_home;
     }
 
-    boolean useCacheConfig = false;
+    /** 由容器在启动/跳回时注入(SettingActivity 改配置后带 useCache 返回) */
+    public void setUseCacheConfig(boolean useCache) {
+        this.useCacheConfig = useCache;
+    }
+
+    /** 已初始化过的首页按新配置重载(等效原"重建 HomeActivity"流程) */
+    public void reloadWithCache() {
+        if (!isViewCreated) {
+            // 尚未初始化:init() 首次可见时自然会用最新 useCacheConfig 走流程
+            return;
+        }
+        dataInitOk = false;
+        jarInitOk = false;
+        dismissHomeDialogs();
+        initData();
+    }
 
     @Override
     protected void init() {
@@ -107,19 +105,11 @@ public class HomeActivity extends BaseActivity {
         // LAN server disabled for mobile: ControlManager.get().startServer();
         initView();
         initViewModel();
-        useCacheConfig = false;
-        Intent intent = getIntent();
-        if (intent != null && intent.getExtras() != null) {
-            Bundle bundle = intent.getExtras();
-            useCacheConfig = bundle.getBoolean("useCache", false);
-        }
         initData();
     }
 
     private void initView() {
-        this.topLayout = findViewById(R.id.topLayout);
         this.tvName = findViewById(R.id.tvName);
-        this.contentLayout = findViewById(R.id.contentLayout);
         this.mGridView = findViewById(R.id.mGridView);
         this.mViewPager = findViewById(R.id.mViewPager);
         this.sortAdapter = new SortAdapter();
@@ -154,8 +144,7 @@ public class HomeActivity extends BaseActivity {
         });
 
         // 分类 tab 长按弹出筛选框（排序/地区等）。
-        // 只有长按"当前正在显示的那个 tab"才生效——例如正在浏览"主页"时长按"主页"会弹出筛选，
-        // 但长按"热播电影"等其它未选中的 tab 不会有任何反应，避免在切换前误触发别的页面筛选。
+        // 只有长按"当前正在显示的那个 tab"才生效。
         sortAdapter.setOnItemLongClickListener((adapter, view, position) -> {
             if (position < 0 || position >= fragments.size()) return false;
             if (position != currentSelected) return false;
@@ -185,8 +174,6 @@ public class HomeActivity extends BaseActivity {
             jumpActivity(SearchActivity.class);
         });
 
-        // OpenList 云盘 / 本地视频 / 本地音乐 入口已移至“我的”页面
-
         // 收藏按钮
         findViewById(R.id.btnCollect).setOnClickListener(v -> {
             FastClickCheckUtil.check(v);
@@ -199,25 +186,20 @@ public class HomeActivity extends BaseActivity {
             jumpActivity(HistoryActivity.class);
         });
 
-        // 底部/左侧导航(公共组件 MainNavBar):跨页跳转路由在组件内部统一处理;
-        // 这里只接管"再次点击首页"的行为——回到第一个 tab 顶部
-        View navBar = findViewById(R.id.bottomNavLayout);
-        if (navBar instanceof MainNavBar) {
-            ((MainNavBar) navBar).setOnTabReselectListener(() -> {
-                mGridView.scrollToPosition(0);
-                if (currentSelected != 0) {
-                    sortFocused = 0;
-                    currentSelected = 0;
-                    mViewPager.setCurrentItem(0, false);
-                    changeTop(false);
-                    updateSortSelection(0);
-                }
-            });
-        }
-
-        setLoadSir(this.contentLayout);
+        setLoadSir(findViewById(R.id.contentLayout));
     }
 
+    /** 导航栏再次点击"首页":回到第一个 tab 顶部(容器调用) */
+    public void scrollToTop() {
+        mGridView.scrollToPosition(0);
+        if (currentSelected != 0) {
+            sortFocused = 0;
+            currentSelected = 0;
+            mViewPager.setCurrentItem(0, false);
+            changeTop(false);
+            updateSortSelection(0);
+        }
+    }
 
     private boolean skipNextUpdate = false;
 
@@ -245,18 +227,18 @@ public class HomeActivity extends BaseActivity {
 
     private boolean dataInitOk = false;
     private boolean jarInitOk = false;
-    private TipDialog mConfigErrorDialog;
+    private com.mobile.novabox.ui.dialog.TipDialog mConfigErrorDialog;
 
     private void initData() {
         if (dataInitOk && jarInitOk) {
             sourceViewModel.getSort(ApiConfig.get().getHomeSourceBean().getKey());
-            if (hasPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE)) {
+            if (mActivity.hasPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE)) {
                 LOG.e("有");
             } else {
                 LOG.e("无");
             }
             if (!useCacheConfig && Hawk.get(HawkConfig.DEFAULT_LOAD_LIVE, false)) {
-                jumpActivity(LivePlayActivity.class);
+                ((MainActivity) mActivity).switchToTab(MainActivity.TAB_LIVE);
             }
             return;
         }
@@ -271,7 +253,6 @@ public class HomeActivity extends BaseActivity {
                         mHandler.postDelayed(new Runnable() {
                             @Override
                             public void run() {
-//                                if (!useCacheConfig) Toast.makeText(HomeActivity.this, "自定义jar加载成功", Toast.LENGTH_SHORT).show();
                                 initData();
                             }
                         }, 50);
@@ -282,7 +263,7 @@ public class HomeActivity extends BaseActivity {
                         mHandler.post(new Runnable() {
                             @Override
                             public void run() {
-                                Toast.makeText(HomeActivity.this, msg, Toast.LENGTH_SHORT).show();
+                                Toast.makeText(mActivity, msg, Toast.LENGTH_SHORT).show();
                             }
                         });
                     }
@@ -294,10 +275,10 @@ public class HomeActivity extends BaseActivity {
                         mHandler.postDelayed(new Runnable() {
                             @Override
                             public void run() {
-                                Toast.makeText(HomeActivity.this, msg+" jar load err", Toast.LENGTH_SHORT).show();
+                                Toast.makeText(mActivity, msg + " jar load err", Toast.LENGTH_SHORT).show();
                                 initData();
                             }
-                        },50);
+                        }, 50);
                     }
                 });
             }
@@ -309,7 +290,7 @@ public class HomeActivity extends BaseActivity {
                 mHandler.post(new Runnable() {
                     @Override
                     public void run() {
-                        Toast.makeText(HomeActivity.this, msg, Toast.LENGTH_SHORT).show();
+                        Toast.makeText(mActivity, msg, Toast.LENGTH_SHORT).show();
                     }
                 });
             }
@@ -348,7 +329,7 @@ public class HomeActivity extends BaseActivity {
                             return;
                         }
                         if (mConfigErrorDialog == null)
-                            mConfigErrorDialog = new TipDialog(HomeActivity.this, msg, "重试", "取消", new TipDialog.OnListener() {
+                            mConfigErrorDialog = new com.mobile.novabox.ui.dialog.TipDialog(mActivity, msg, "重试", "取消", new com.mobile.novabox.ui.dialog.TipDialog.OnListener() {
                                 @Override
                                 public void left() {
                                     mHandler.post(new Runnable() {
@@ -391,13 +372,11 @@ public class HomeActivity extends BaseActivity {
                     }
                 });
             }
-        }, this);
+        }, mActivity);
     }
 
     /**
      * phone: highlight the active tab by selection state, not TV remote focus.
-     * RecyclerView recycles item views, so we walk all currently attached
-     * tab views and set selected only on the one matching selectedPosition.
      */
     private void updateSortSelection(int selectedPosition) {
         if (mGridView == null || mGridView.getLayoutManager() == null) return;
@@ -425,17 +404,17 @@ public class HomeActivity extends BaseActivity {
             for (MovieSort.SortData data : sortAdapter.getData()) {
                 if (data.id.equals("my0")) {
                     if (Hawk.get(HawkConfig.HOME_REC, 0) == 1 && absXml != null && absXml.videoList != null && absXml.videoList.size() > 0) {
-                        fragments.add(UserFragment.newInstance(absXml.videoList));
+                        fragments.add(com.mobile.novabox.ui.fragment.UserFragment.newInstance(absXml.videoList));
                     } else {
-                        fragments.add(UserFragment.newInstance(null));
+                        fragments.add(com.mobile.novabox.ui.fragment.UserFragment.newInstance(null));
                     }
                 } else {
                     fragments.add(GridFragment.newInstance(data));
                 }
             }
-            pageAdapter = new HomePageAdapter(getSupportFragmentManager(), fragments);
+            pageAdapter = new HomePageAdapter(getChildFragmentManager(), fragments);
             try {
-                Field field = ViewPager.class.getDeclaredField("mScroller");
+                Field field = androidx.viewpager.widget.ViewPager.class.getDeclaredField("mScroller");
                 field.setAccessible(true);
                 FixedSpeedScroller scroller = new FixedSpeedScroller(mContext, new AccelerateInterpolator());
                 field.set(mViewPager, scroller);
@@ -448,25 +427,27 @@ public class HomeActivity extends BaseActivity {
         }
     }
 
-    @SuppressLint("NotifyDataSetChanged")
-    @Override
-    public void onBackPressed() {
+    /**
+     * 返回键处理(由容器 MainActivity 调用)。
+     * @return true 表示本 Fragment 已消费(打断加载/恢复列表状态等);
+     *         false 表示可以退出应用(容器执行二次确认退出)。
+     */
+    public boolean handleBack() {
         // 打断加载
         if (isLoading()) {
             refreshEmpty();
-            return;
+            return true;
         }
         // 如果处于 VOD 删除模式，则退出该模式并刷新界面
         if (HawkConfig.hotVodDelete) {
             HawkConfig.hotVodDelete = false;
-            UserFragment.homeHotVodAdapter.notifyDataSetChanged();
-            return;
+            com.mobile.novabox.ui.fragment.UserFragment.homeHotVodAdapter.notifyDataSetChanged();
+            return true;
         }
 
         // 检查 fragments 状态
         if (this.fragments.size() <= 0 || this.sortFocused >= this.fragments.size() || this.sortFocused < 0) {
-            doExit();
-            return;
+            return false;
         }
 
         BaseLazyFragment baseLazyFragment = this.fragments.get(this.sortFocused);
@@ -474,65 +455,48 @@ public class HomeActivity extends BaseActivity {
             GridFragment grid = (GridFragment) baseLazyFragment;
             // 如果当前 Fragment 能恢复之前保存的 UI 状态，则直接返回
             if (grid.restoreView()) {
-                return;
+                return true;
             }
             // 如果 sortFocusView 存在且没有获取焦点，则请求焦点
             if (this.sortFocusView != null && !this.sortFocusView.isFocused()) {
                 this.sortFocusView.requestFocus();
+                return true;
             }
             // 如果当前不是第一个界面，则将列表设置到第一项
             else if (this.sortFocused != 0) {
                 this.mGridView.scrollToPosition(0);
+                return true;
             } else {
-                doExit();
+                return false;
             }
-        } else if (baseLazyFragment instanceof UserFragment && UserFragment.tvHotList.canScrollVertically(-1)) {
+        } else if (baseLazyFragment instanceof com.mobile.novabox.ui.fragment.UserFragment && com.mobile.novabox.ui.fragment.UserFragment.tvHotList.canScrollVertically(-1)) {
             // 如果 UserFragment 列表可以向上滚动，则滚动到顶部
-            UserFragment.tvHotList.scrollToPosition(0);
+            com.mobile.novabox.ui.fragment.UserFragment.tvHotList.scrollToPosition(0);
             this.mGridView.scrollToPosition(0);
+            return true;
         } else {
-            doExit();
+            return false;
         }
     }
 
-    private void doExit() {
-        // 如果两次返回间隔小于 2000 毫秒，则退出应用
-        if (System.currentTimeMillis() - mExitTime < 2000) {
-            unregisterEventBus();
-            ControlManager.get().stopServer();
-            // 用户主动退出App:代理已被停掉,若之前因投屏启动了保活服务,同步停止,
-            // 避免出现"通知还在显示投屏运行中,但代理其实已经不在了"的不一致状态。
-            com.mobile.novabox.cast.CastProxyService.stop(this);
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
-                ActivityManager activityManager = (ActivityManager) getSystemService(ACTIVITY_SERVICE);
-                if (activityManager != null) {
-                    for (ActivityManager.AppTask appTask : activityManager.getAppTasks()) {
-                        appTask.finishAndRemoveTask();
-                    }
-                } else {
-                    finishAndRemoveTask();
-                }
+    /** MENU 键处理(由容器转发):长按进设置,短按弹站源切换。返回是否消费。 */
+    public boolean onMenuKeyEvent(KeyEvent event) {
+        if (event.getKeyCode() != KeyEvent.KEYCODE_MENU) return false;
+        if (event.getAction() == KeyEvent.ACTION_DOWN) {
+            menuKeyDownTime = System.currentTimeMillis();
+        } else if (event.getAction() == KeyEvent.ACTION_UP) {
+            long pressDuration = System.currentTimeMillis() - menuKeyDownTime;
+            if (pressDuration >= LONG_PRESS_THRESHOLD) {
+                jumpActivity(SettingActivity.class);
             } else {
-                AppManager.getInstance().finishAllActivity();
-                finish();
+                showSiteSwitch();
             }
-        } else {
-            // 否则仅提示用户，再按一次退出应用
-            mExitTime = System.currentTimeMillis();
-            Toast.makeText(mContext, "再按一次返回键退出应用", Toast.LENGTH_SHORT).show();
         }
+        return true;
     }
 
-    @Override
-    protected void onResume() {
-        super.onResume();
-    }
-
-
-    @Override
-    protected void onPause() {
-        super.onPause();
-    }
+    private long menuKeyDownTime = 0;
+    private static final long LONG_PRESS_THRESHOLD = 2000; // 设置长按的阈值，单位是毫秒
 
     @Subscribe(threadMode = ThreadMode.MAIN)
     public void refresh(RefreshEvent event) {
@@ -542,7 +506,7 @@ public class HomeActivity extends BaseActivity {
                 newIntent.putExtra("id", (String) event.obj);
                 newIntent.putExtra("sourceKey", "push_agent");
                 newIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-                HomeActivity.this.startActivity(newIntent);
+                mActivity.startActivity(newIntent);
             }
         } else if (event.type == RefreshEvent.TYPE_FILTER_CHANGE) {
             if (currentView != null) {
@@ -557,64 +521,16 @@ public class HomeActivity extends BaseActivity {
         currentView.findViewById(R.id.tvFilter).setVisibility(visible ? View.GONE : View.VISIBLE);
     }
 
-    private final Runnable mDataRunnable = new Runnable() {
-        @Override
-        public void run() {
-            if (sortChange) {
-                sortChange = false;
-                BaseLazyFragment baseLazyFragment = fragments.get(sortFocused);
-                if (sortFocused != currentSelected) {
-                    currentSelected = sortFocused;
-                    mViewPager.setCurrentItem(sortFocused, false);
-                    changeTop(sortFocused != 0);
-                    if (baseLazyFragment instanceof GridFragment && ((GridFragment) baseLazyFragment).shouldReloadOnSelect()) {
-                        ((GridFragment) baseLazyFragment).forceRefresh();
-                    }
-                } else if (baseLazyFragment instanceof GridFragment && ((GridFragment) baseLazyFragment).shouldReloadOnSelect()) {
-                    ((GridFragment) baseLazyFragment).forceRefresh();
-                }
-            }
-        }
-    };
-
-    private long menuKeyDownTime = 0;
-    private static final long LONG_PRESS_THRESHOLD = 2000; // 设置长按的阈值，单位是毫秒
-    @Override
-    public boolean dispatchKeyEvent(KeyEvent event) {
-        if (topHide < 0)
-            return false;
-        int keyCode = event.getKeyCode();
-        if (keyCode == KeyEvent.KEYCODE_MENU) {
-            if (event.getAction() == KeyEvent.ACTION_DOWN) {
-                menuKeyDownTime = System.currentTimeMillis();
-            } else if (event.getAction() == KeyEvent.ACTION_UP) {
-                long pressDuration = System.currentTimeMillis() - menuKeyDownTime;
-                if (pressDuration >= LONG_PRESS_THRESHOLD) {
-                    jumpActivity(SettingActivity.class);;
-                }else {
-                    showSiteSwitch();
-                }
-            }
-        }
-        return super.dispatchKeyEvent(event);
-    }
-
-    byte topHide = 0;
-
     private void changeTop(boolean hide) {
         // 手机版：顶部导航栏在所有分类页面下保持常驻显示，不做隐藏动画
     }
 
     @Override
-    protected void onDestroy() {
+    public void onDestroy() {
         dismissHomeDialogs();
         mHandler.removeCallbacksAndMessages(null);
-        super.onDestroy();
         unregisterEventBus();
-        if (isFinishing()) {
-            ControlManager.get().stopServer();
-            com.mobile.novabox.cast.CastProxyService.stop(this);
-        }
+        super.onDestroy();
     }
 
     private void unregisterEventBus() {
@@ -633,14 +549,14 @@ public class HomeActivity extends BaseActivity {
         int currentSelect = sites.indexOf(ApiConfig.get().getHomeSourceBean());
         if (currentSelect < 0) currentSelect = 0;
 
-        android.app.Dialog dialog = new android.app.Dialog(this, R.style.CustomDialogStyleDim);
+        android.app.Dialog dialog = new android.app.Dialog(mActivity, R.style.CustomDialogStyleDim);
         dialog.setContentView(R.layout.dialog_site_switch);
         android.view.Window window = dialog.getWindow();
         if (window != null) {
-            int maxH = (int)(getResources().getDisplayMetrics().heightPixels * 0.55f);
+            int maxH = (int) (getResources().getDisplayMetrics().heightPixels * 0.55f);
             window.setLayout(
-                (int)(getResources().getDisplayMetrics().widthPixels * 0.88f),
-                android.view.ViewGroup.LayoutParams.WRAP_CONTENT);
+                    (int) (getResources().getDisplayMetrics().widthPixels * 0.88f),
+                    android.view.ViewGroup.LayoutParams.WRAP_CONTENT);
             window.setGravity(android.view.Gravity.CENTER);
         }
 
@@ -648,17 +564,19 @@ public class HomeActivity extends BaseActivity {
         dialog.findViewById(R.id.ivClose).setOnClickListener(v -> dialog.dismiss());
 
         RecyclerView rv = dialog.findViewById(R.id.list);
-        rv.setLayoutManager(new GridLayoutManager(this, 2));
+        rv.setLayoutManager(new androidx.recyclerview.widget.GridLayoutManager(mContext, 2));
         final int[] selectedIdx = {currentSelect};
 
-        android.view.LayoutInflater inflater = android.view.LayoutInflater.from(this);
+        android.view.LayoutInflater inflater = android.view.LayoutInflater.from(mActivity);
         rv.setAdapter(new RecyclerView.Adapter<RecyclerView.ViewHolder>() {
             @NonNull
             @Override
             public RecyclerView.ViewHolder onCreateViewHolder(@NonNull android.view.ViewGroup parent, int viewType) {
                 android.view.View v = inflater.inflate(R.layout.item_site_switch, parent, false);
-                return new RecyclerView.ViewHolder(v) {};
+                return new RecyclerView.ViewHolder(v) {
+                };
             }
+
             @Override
             public void onBindViewHolder(@NonNull RecyclerView.ViewHolder holder, @SuppressLint("RecyclerView") int position) {
                 android.widget.TextView tvName = holder.itemView.findViewById(R.id.tvName);
@@ -669,7 +587,10 @@ public class HomeActivity extends BaseActivity {
                 ivCheck.setImageResource(isSelected ? R.drawable.icon_radio_selected : R.drawable.icon_radio_unselect);
                 tvName.setTextColor(isSelected ? 0xff02f8e1 : 0xFF000000);
                 holder.itemView.setOnClickListener(v -> {
-                    if (position == selectedIdx[0]) { dialog.dismiss(); return; }
+                    if (position == selectedIdx[0]) {
+                        dialog.dismiss();
+                        return;
+                    }
                     selectedIdx[0] = position;
                     notifyDataSetChanged();
                     dialog.dismiss();
@@ -677,8 +598,11 @@ public class HomeActivity extends BaseActivity {
                     refreshHome();
                 });
             }
+
             @Override
-            public int getItemCount() { return sites.size(); }
+            public int getItemCount() {
+                return sites.size();
+            }
         });
 
         rv.post(() -> rv.scrollToPosition(Math.max(0, selectedIdx[0] - 2)));
@@ -689,26 +613,25 @@ public class HomeActivity extends BaseActivity {
     private void showRouteSelect() {
         // 复用设置页的线路选择弹窗,与用户在设置里看到的一致。
         // 选完后切换 API_URL,保存历史,并杀进程重启 App 让 ApiConfig/PlayerHelper/Hawk 等单例重新加载。
-        // (不能只 startActivity(FLAG_ACTIVITY_CLEAR_TASK),否则 ApplicationContext 单例还是旧的,
-        //  加载的还是缓存的旧源 — 这就是之前切换不生效必须杀掉 app 才生效的根因。)
-        com.mobile.novabox.ui.dialog.RouteSelectDialog.show(this, new com.mobile.novabox.ui.dialog.RouteSelectDialog.OnRouteSelectedListener() {
+        com.mobile.novabox.ui.dialog.RouteSelectDialog.show(mActivity, new com.mobile.novabox.ui.dialog.RouteSelectDialog.OnRouteSelectedListener() {
             @Override
             public void onSelected(String url) {
                 String oldApi = Hawk.get(HawkConfig.API_URL, "");
                 Hawk.put(HawkConfig.API_URL, url);
                 com.mobile.novabox.util.HistoryHelper.setApiHistory(url);
                 if (!oldApi.equals(url)) {
-                    android.widget.Toast.makeText(HomeActivity.this, "配置已切换,即将自动重启应用!", android.widget.Toast.LENGTH_SHORT).show();
+                    android.widget.Toast.makeText(mActivity, "配置已切换,即将自动重启应用!", android.widget.Toast.LENGTH_SHORT).show();
                     com.mobile.novabox.base.App.restartApp(2500);
                 }
             }
+
             @Override
             public void onCancel() { /* no-op */ }
         });
     }
 
-    private void refreshHome()
-    {
+    /** 站源切换后整任务重启容器(携带 useCache),等效原 HomeActivity 的 CLEAR_TASK 自重建 */
+    private void refreshHome() {
         if (Thread.currentThread() != android.os.Looper.getMainLooper().getThread()) {
             mHandler.post(new Runnable() {
                 @Override
@@ -722,16 +645,16 @@ public class HomeActivity extends BaseActivity {
             return;
         }
         dismissHomeDialogs();
-        Intent intent = new Intent(getApplicationContext(), HomeActivity.class);
+        Intent intent = new Intent(mContext.getApplicationContext(), MainActivity.class);
         intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
         Bundle bundle = new Bundle();
         bundle.putBoolean("useCache", true);
         intent.putExtras(bundle);
-        HomeActivity.this.startActivity(intent);
+        mActivity.startActivity(intent);
     }
 
     private boolean isActivityUnavailable() {
-        return isFinishing() || (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.JELLY_BEAN_MR1 && isDestroyed());
+        return !isAdded() || mActivity == null || mActivity.isFinishing() || mActivity.isDestroyed();
     }
 
     private void dismissHomeDialogs() {
@@ -757,17 +680,15 @@ public class HomeActivity extends BaseActivity {
         }
     }
 
-    private void refreshEmpty()
-    {
-        skipNextUpdate=true;
+    private void refreshEmpty() {
+        skipNextUpdate = true;
         showSuccess();
         sortAdapter.setNewData(DefaultConfig.adjustSort(ApiConfig.get().getHomeSourceBean().getKey(), new ArrayList<>(), true));
         initViewPager(null);
         tvName.clearAnimation();
     }
 
-    private void tvNameAnimation()
-    {
+    private void tvNameAnimation() {
         AlphaAnimation blinkAnimation = new AlphaAnimation(0.0f, 1.0f);
         blinkAnimation.setDuration(500);
         blinkAnimation.setStartOffset(20);
