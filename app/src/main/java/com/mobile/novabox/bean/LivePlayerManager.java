@@ -23,12 +23,9 @@ public class LivePlayerManager {
     public void init(VideoView videoView) {
         try {
             currentApi=Hawk.get(HawkConfig.LIVE_API_URL,"");
-            // 4 档 LIVE_PLAY_TYPE:0=EXO硬解,1=EXO软解,2=IJK硬解,3=IJK软解;默认 IJK硬解(2)
-            // 直播播放器与视频播放器(点播 PLAY_TYPE)相互独立配置,不再互相回退
-            // 用 safeGetInt 兼容历史脏数据(曾被误存成 String)，避免直接 Hawk.get(key,int) 抛
-            // ClassCastException 导致直播页进不去、被迫回到首页
+            // 6 档 LIVE_PLAY_TYPE:0=EXO硬解,1=EXO软解,2=IJK硬解,3=IJK软解,4=MPV硬解,5=MPV软解;默认 IJK硬解(2)
             int playType = com.mobile.novabox.api.ApiConfig.safeGetInt(HawkConfig.LIVE_PLAY_TYPE, 2);
-            if (playType < 0 || playType > 3) playType = 2;
+            if (playType < 0 || playType > 5) playType = 2;
             defaultPlayerConfig.put("pl", playType);
             defaultPlayerConfig.put("ijk", Hawk.get(HawkConfig.IJK_CODEC, "硬解码"));
             defaultPlayerConfig.put("pr", Hawk.get(HawkConfig.PLAY_RENDER, 0));
@@ -90,17 +87,10 @@ public class LivePlayerManager {
         int playerTypeIndex = 0;
         try {
             int playerType = currentPlayerConfig.getInt("pl");
-            // 4 档直接对应 position(EXO硬解=0, EXO软解=1, IJK硬解=2, IJK软解=3)
-            // 兼容历史 PLAY_TYPE:0=系统 -> IJK硬解(2),1=IJK -> IJK硬解(2),2=EXO -> EXO硬解(0)
-            if (playerType == 0 || playerType > 3) {
-                // 历史 0=系统播放器,新 0=EXO硬解;历史配置已归一化,这里按 EXO硬解(0)显示
-                playerTypeIndex = 0;
-            } else if (playerType == 1) {
-                playerTypeIndex = 1; // EXO软解
-            } else if (playerType == 2) {
-                playerTypeIndex = 2; // IJK硬解
+            if (playerType >= 0 && playerType <= 5) {
+                playerTypeIndex = playerType;
             } else {
-                playerTypeIndex = 3; // IJK软解
+                playerTypeIndex = 0;
             }
         } catch (JSONException e) {
             e.printStackTrace();
@@ -121,23 +111,30 @@ public class LivePlayerManager {
         channelName=currentCfgKey(channelName);
         JSONObject playerConfig = currentPlayerConfig;
         try {
-            // 4 档位置直接映射到 PLAY_TYPE(0=EXO硬解,1=EXO软解,2=IJK硬解,3=IJK软解)
             switch (playerType) {
                 case 0:
-                    playerConfig.put("pl", 0); // EXO硬解
+                    playerConfig.put("pl", 0);
                     playerConfig.put("ijk", "硬解码");
                     break;
                 case 1:
-                    playerConfig.put("pl", 1); // EXO软解
+                    playerConfig.put("pl", 1);
                     playerConfig.put("ijk", "硬解码");
                     break;
                 case 2:
-                    playerConfig.put("pl", 2); // IJK硬解
+                    playerConfig.put("pl", 2);
                     playerConfig.put("ijk", "硬解码");
                     break;
                 case 3:
-                    playerConfig.put("pl", 3); // IJK软解
+                    playerConfig.put("pl", 3);
                     playerConfig.put("ijk", "软解码");
+                    break;
+                case 4:
+                    playerConfig.put("pl", 4);
+                    playerConfig.put("ijk", "硬解码");
+                    break;
+                case 5:
+                    playerConfig.put("pl", 5);
+                    playerConfig.put("ijk", "硬解码");
                     break;
             }
         } catch (JSONException e) {
@@ -153,14 +150,6 @@ public class LivePlayerManager {
         currentPlayerConfig = playerConfig;
     }
 
-    /**
-     * 自动切换播放内核(直播播放失败时由上层调用)。
-     * 按固定顺序 0→1→2→3 尝试除当前外的其余内核,已尝试过的记录在 triedPlayerTypes 中。
-     *
-     * @param triedPlayerTypes 已尝试过的内核档位集合(内部会累加当前内核)
-     * @return true 表示已切换到下一个内核,调用方应使用当前源 URL 重新播放;
-     *         false 表示其余三个内核都已试过(或配置不支持),调用方应降级处理(如换源/换频道)
-     */
     public boolean switchLivePlayer(VideoView videoView, String channelName, Set<Integer> triedPlayerTypes) {
         channelName = currentCfgKey(channelName);
         JSONObject playerConfig = currentPlayerConfig;
