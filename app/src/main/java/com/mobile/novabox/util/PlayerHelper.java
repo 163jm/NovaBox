@@ -7,6 +7,7 @@ import com.mobile.novabox.api.ApiConfig;
 import com.mobile.novabox.bean.IJKCode;
 import com.mobile.novabox.player.ExoMediaPlayerFactory;
 import com.mobile.novabox.player.IjkMediaPlayer;
+import com.mobile.novabox.player.MpvMediaPlayer;
 import com.mobile.novabox.player.render.SurfaceRenderViewFactory;
 import com.mobile.novabox.player.thirdparty.Kodi;
 import com.mobile.novabox.player.thirdparty.MXPlayer;
@@ -29,11 +30,13 @@ import xyz.doikki.videoplayer.render.RenderViewFactory;
 import xyz.doikki.videoplayer.render.TextureRenderViewFactory;
 
 public class PlayerHelper {
-    /** 播放器类型:0=EXO硬解,1=EXO软解,2=IJK硬解,3=IJK软解,10+=外部播放器 */
+    /** 播放器类型:0=EXO硬解,1=EXO软解,2=IJK硬解,3=IJK软解,4=MPV硬解,5=MPV软解,10+=外部播放器 */
     public static final int PLAY_TYPE_EXO_HW = 0;
     public static final int PLAY_TYPE_EXO_SW = 1;
     public static final int PLAY_TYPE_IJK_HW = 2;
     public static final int PLAY_TYPE_IJK_SW = 3;
+    public static final int PLAY_TYPE_MPV_HW = 4;
+    public static final int PLAY_TYPE_MPV_SW = 5;
 
     public static void updateCfg(VideoView videoView, JSONObject playerCfg) {
         updateCfg(videoView,playerCfg,-1);
@@ -52,8 +55,6 @@ public class PlayerHelper {
             e.printStackTrace();
         }
         if(forcePlayerType>=0)playerType = forcePlayerType;
-        // PLAY_TYPE 统一为 4 档新编码(0=EXO硬解,1=EXO软解,2=IJK硬解,3=IJK软解),
-        // 各入口(设置页/自动切换内核)写入的都是新编码,不再做历史 1=IJK/2=EXO 映射。
 
         IJKCode codec = ApiConfig.get().getIJKCodec(ijkCode);
         PlayerFactory playerFactory = buildPlayerFactory(playerType, codec);
@@ -76,8 +77,6 @@ public class PlayerHelper {
 
     public static void updateCfg(VideoView videoView) {
         int playType = Hawk.get(HawkConfig.PLAY_TYPE, PLAY_TYPE_IJK_HW);
-        // PLAY_TYPE 统一为 4 档新编码,直接使用,不做历史 1=IJK/2=EXO 映射。
-
         IJKCode codec = ApiConfig.get().getIJKCodec("硬解码");
         PlayerFactory playerFactory = buildPlayerFactory(playType, codec);
         int renderType = Hawk.get(HawkConfig.PLAY_RENDER, 0);
@@ -95,12 +94,8 @@ public class PlayerHelper {
         videoView.setRenderViewFactory(renderViewFactory);
     }
 
-    /**
-     * 强制按指定内核档位重建播放器(0=EXO硬解,1=EXO软解,2=IJK硬解,3=IJK软解)。
-     * 供播放失败自动切内核重试使用;入参即 4 档新编码,不做老编码映射。
-     */
     public static void updateCfg(VideoView videoView, int playerType) {
-        if (playerType < 0 || playerType > 3) playerType = PLAY_TYPE_IJK_HW;
+        if (playerType < 0 || playerType > 5) playerType = PLAY_TYPE_IJK_HW;
         IJKCode codec = ApiConfig.get().getIJKCodec(playerType == PLAY_TYPE_IJK_SW ? "软解码" : "硬解码");
         PlayerFactory playerFactory = buildPlayerFactory(playerType, codec);
         int renderType = Hawk.get(HawkConfig.PLAY_RENDER, 0);
@@ -118,11 +113,6 @@ public class PlayerHelper {
         videoView.setRenderViewFactory(renderViewFactory);
     }
 
-    /**
-     * 音频播放专用:固定使用 EXO硬解,不受用户"设置"里全局 PLAY_TYPE(IJK等)影响。
-     * 音频场景对硬解性能不敏感,EXO 在纯音频/网络流兼容性上更稳定,
-     * 供 OpenList 音频播放、本地音频播放统一调用。
-     */
     public static void updateCfgAudioForceExo(VideoView videoView) {
         IJKCode codec = ApiConfig.get().getIJKCodec("硬解码");
         PlayerFactory playerFactory = buildPlayerFactory(PLAY_TYPE_EXO_HW, codec);
@@ -141,21 +131,29 @@ public class PlayerHelper {
         videoView.setRenderViewFactory(renderViewFactory);
     }
 
-    /**
-     * 根据 PLAY_TYPE(4 档)+ IJKCodec 构建 PlayerFactory。
-     * 调用方需要自行确保 IJK 类的 codec 参数(只在 IJK 路径下生效)。
-     */
     private static PlayerFactory buildPlayerFactory(int playerType, IJKCode codec) {
         switch (playerType) {
             case PLAY_TYPE_EXO_HW:
                 return ExoMediaPlayerFactory.create();
             case PLAY_TYPE_EXO_SW:
                 return ExoMediaPlayerFactory.createSoftwareDecode();
+            case PLAY_TYPE_MPV_HW:
+                return new PlayerFactory<MpvMediaPlayer>() {
+                    @Override
+                    public MpvMediaPlayer createPlayer(Context context) {
+                        return new MpvMediaPlayer(context, true);
+                    }
+                };
+            case PLAY_TYPE_MPV_SW:
+                return new PlayerFactory<MpvMediaPlayer>() {
+                    @Override
+                    public MpvMediaPlayer createPlayer(Context context) {
+                        return new MpvMediaPlayer(context, false);
+                    }
+                };
             case PLAY_TYPE_IJK_HW:
             case PLAY_TYPE_IJK_SW:
             default:
-                // IJK 路径:玩家类型本身已经决定软硬解;
-                // 仍把 codec 传给 IjkMediaPlayer 兼容老接口(默认会用 mediacodec=1/0)
                 return new PlayerFactory<IjkMediaPlayer>() {
                     @Override
                     public IjkMediaPlayer createPlayer(Context context) {
@@ -164,7 +162,6 @@ public class PlayerHelper {
                 };
         }
     }
-
 
     public static void init() {
         try {
@@ -192,16 +189,16 @@ public class PlayerHelper {
         }
     }
 
-    private static HashMap<Integer, String> mPlayersInfo = null;
+    private static java.util.LinkedHashMap<Integer, String> mPlayersInfo = null;
     public static HashMap<Integer, String> getPlayersInfo() {
         if (mPlayersInfo == null) {
-            HashMap<Integer, String> playersInfo = new HashMap<>();
-            // 4 档内置播放器:EXO硬解 / EXO软解 / IJK硬解 / IJK软解(已移除系统播放器)
+            java.util.LinkedHashMap<Integer, String> playersInfo = new java.util.LinkedHashMap<>();
             playersInfo.put(PLAY_TYPE_EXO_HW, "EXO硬解");
             playersInfo.put(PLAY_TYPE_EXO_SW, "EXO软解");
             playersInfo.put(PLAY_TYPE_IJK_HW, "IJK硬解");
             playersInfo.put(PLAY_TYPE_IJK_SW, "IJK软解");
-            // 第三方外部播放器保持不变
+            playersInfo.put(PLAY_TYPE_MPV_HW, "MPV硬解");
+            playersInfo.put(PLAY_TYPE_MPV_SW, "MPV软解");
             playersInfo.put(10, "MX播放器");
             playersInfo.put(11, "Reex播放器");
             playersInfo.put(12, "Kodi播放器");
@@ -212,14 +209,16 @@ public class PlayerHelper {
         return mPlayersInfo;
     }
 
-    private static HashMap<Integer, Boolean> mPlayersExistInfo = null;
+    private static java.util.LinkedHashMap<Integer, Boolean> mPlayersExistInfo = null;
     public static HashMap<Integer, Boolean> getPlayersExistInfo() {
         if (mPlayersExistInfo == null) {
-            HashMap<Integer, Boolean> playersExist = new HashMap<>();
+            java.util.LinkedHashMap<Integer, Boolean> playersExist = new java.util.LinkedHashMap<>();
             playersExist.put(PLAY_TYPE_EXO_HW, true);
             playersExist.put(PLAY_TYPE_EXO_SW, true);
             playersExist.put(PLAY_TYPE_IJK_HW, true);
             playersExist.put(PLAY_TYPE_IJK_SW, true);
+            playersExist.put(PLAY_TYPE_MPV_HW, true);
+            playersExist.put(PLAY_TYPE_MPV_SW, true);
             playersExist.put(10, MXPlayer.getPackageInfo() != null);
             playersExist.put(11, ReexPlayer.getPackageInfo() != null);
             playersExist.put(12, Kodi.getPackageInfo() != null);
@@ -323,7 +322,7 @@ public class PlayerHelper {
             return speed > 0?speed + "B/s":(show?"0B/s":"");
     }
     public static String getDisplaySpeedBps(long speed, boolean show) {
-        long bitSpeed = speed * 8; // 字节转比特
+        long bitSpeed = speed * 8;
         if (bitSpeed >= 1_000_000_000) {
             return new DecimalFormat("0.00").format(bitSpeed / 1_000_000_000d) + "Gbps";
         } else if (bitSpeed >= 1_000_000) {
