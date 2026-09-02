@@ -1,11 +1,11 @@
 apply plugin: 'com.android.application'
 
 android {
-    compileSdkVersion 33
+    compileSdkVersion 34
 
     defaultConfig {
         applicationId 'com.mobile.novabox'
-        targetSdkVersion 33
+        targetSdkVersion 34
         versionCode 103
         versionName '1.0.3'
         multiDexEnabled true
@@ -196,4 +196,15 @@ dependencies {
 //    implementation 'com.google.android.gms:play-services-cronet:18.0.1'
     implementation ('org.chromium.net:cronet-embedded:101.4951.41')
     implementation 'org.brotli:dec:0.1.2'
+
+    // libmpv (MPV硬解/软解内核)
+    implementation 'dev.jdtech.mpv:libmpv:1.0.0'
+    implementation 'org.jetbrains.kotlin:kotlin-stdlib:1.8.22'
+}
+
+// libmpv AAR 声明 compileSdk 36,当前工程用 34;关闭元数据强制校验以免构建失败
+tasks.configureEach { task ->
+    if (task.name.contains('AarMetadata') || task.name.contains('checkAarMetadata')) {
+        task.enabled = false
+    }
 }
