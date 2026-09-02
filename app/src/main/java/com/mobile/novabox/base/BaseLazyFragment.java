@@ -288,6 +288,11 @@ public abstract class BaseLazyFragment extends Fragment implements CustomAdapt {
         return false;
     }
 
+    /** 判断权限(委托宿主 BaseActivity.hasPermission,避免子 Fragment 直接依赖具体容器类型) */
+    protected boolean hasPermission(String permission) {
+        return mActivity instanceof BaseActivity && ((BaseActivity) mActivity).hasPermission(permission);
+    }
+
     public void jumpActivity(Class<? extends BaseActivity> clazz) {
         Intent intent = new Intent(mContext, clazz);
         startActivity(intent);

@@ -1450,7 +1450,7 @@ public class LiveFragment extends BaseLazyFragment {
         LOG.i("echo-live-url:"+url);
 
         if(url.contains(".py") || url.contains(".js")){
-            if ((url.contains(".py") || url.contains(".js")) && !mActivity.hasPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE)) {
+            if ((url.contains(".py") || url.contains(".js")) && !hasPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE)) {
                 // 权限不足时，直接设置默认播放列表
                 Toast.makeText(App.getInstance(), "该源需要存储权限", Toast.LENGTH_SHORT).show();
                 setEmptyLiveChannelList();

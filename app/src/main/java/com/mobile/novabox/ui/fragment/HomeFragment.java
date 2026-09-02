@@ -232,13 +232,13 @@ public class HomeFragment extends BaseLazyFragment {
     private void initData() {
         if (dataInitOk && jarInitOk) {
             sourceViewModel.getSort(ApiConfig.get().getHomeSourceBean().getKey());
-            if (mActivity.hasPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE)) {
+            if (hasPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE)) {
                 LOG.e("有");
             } else {
                 LOG.e("无");
             }
             if (!useCacheConfig && Hawk.get(HawkConfig.DEFAULT_LOAD_LIVE, false)) {
-                ((MainActivity) mActivity).switchToTab(MainActivity.TAB_LIVE);
+                ((MainActivity) mActivity).switchToTab(MainActivity.TAB_LIVE, false);
             }
             return;
         }
