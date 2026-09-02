@@ -998,28 +998,8 @@ public class LivePlayActivity extends BaseActivity {
             }
         });
 
-        // 底部导航栏
-        View liveNavHome = findViewById(R.id.liveNavHome);
-        View liveNavLive = findViewById(R.id.liveNavLive);
-        View liveNavSetting = findViewById(R.id.liveNavSetting);
-        if (liveNavHome != null) {
-            liveNavHome.setOnClickListener(v -> {
-                // 明确跳转到 HomeActivity，清除其上面的所有 Activity，避免因返回栈不同而跳到错误页面
-                android.content.Intent intent = new android.content.Intent(this, com.mobile.novabox.ui.activity.HomeActivity.class);
-                intent.addFlags(android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP | android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP);
-                startActivity(intent);
-                finish();
-            });
-        }
-        if (liveNavLive != null) {
-            liveNavLive.setOnClickListener(v -> { /* 当前页面，无需操作 */ });
-        }
-        if (liveNavSetting != null) {
-            liveNavSetting.setOnClickListener(v -> {
-                finish();
-                jumpActivity(com.mobile.novabox.ui.activity.MyActivity.class);
-            });
-        }
+        // 底部/左侧导航由公共组件 MainNavBar 处理(app:navSelected="live"),
+        // 显隐控制见 live_bottom_nav 的全屏切换逻辑
 
         tvSettingsClose.setOnClickListener(new View.OnClickListener() {
             @Override

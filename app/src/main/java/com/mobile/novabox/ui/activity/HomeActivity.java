@@ -53,6 +53,7 @@ import com.mobile.novabox.ui.fragment.UserFragment;
 import com.mobile.novabox.ui.tv.widget.DefaultTransformer;
 import com.mobile.novabox.ui.tv.widget.FixedSpeedScroller;
 import com.mobile.novabox.ui.tv.widget.NoScrollViewPager;
+import com.mobile.novabox.ui.widget.MainNavBar;
 import com.mobile.novabox.util.AppManager;
 import com.mobile.novabox.util.DefaultConfig;
 import com.mobile.novabox.util.FastClickCheckUtil;
@@ -198,29 +199,21 @@ public class HomeActivity extends BaseActivity {
             jumpActivity(HistoryActivity.class);
         });
 
-        // 底部导航：首页（回到第一个tab顶部）
-        findViewById(R.id.navHome).setOnClickListener(v -> {
-            mGridView.scrollToPosition(0);
-            if (currentSelected != 0) {
-                sortFocused = 0;
-                currentSelected = 0;
-                mViewPager.setCurrentItem(0, false);
-                changeTop(false);
-                updateSortSelection(0);
-            }
-        });
-
-        // 底部导航：直播
-        findViewById(R.id.navLive).setOnClickListener(v -> {
-            FastClickCheckUtil.check(v);
-            jumpActivity(LivePlayActivity.class);
-        });
-
-        // 底部导航：我的
-        findViewById(R.id.navSetting).setOnClickListener(v -> {
-            FastClickCheckUtil.check(v);
-            jumpActivity(MyActivity.class);
-        });
+        // 底部/左侧导航(公共组件 MainNavBar):跨页跳转路由在组件内部统一处理;
+        // 这里只接管"再次点击首页"的行为——回到第一个 tab 顶部
+        View navBar = findViewById(R.id.bottomNavLayout);
+        if (navBar instanceof MainNavBar) {
+            ((MainNavBar) navBar).setOnTabReselectListener(() -> {
+                mGridView.scrollToPosition(0);
+                if (currentSelected != 0) {
+                    sortFocused = 0;
+                    currentSelected = 0;
+                    mViewPager.setCurrentItem(0, false);
+                    changeTop(false);
+                    updateSortSelection(0);
+                }
+            });
+        }
 
         setLoadSir(this.contentLayout);
     }

@@ -105,29 +105,7 @@ public class MyActivity extends BaseActivity {
             });
         }
 
-        initNav();
-    }
-
-    private void initNav() {
-        // 左侧/底部导航：首页
-        View navHome = findViewById(R.id.navHome);
-        if (navHome != null) {
-            navHome.setOnClickListener(v -> {
-                FastClickCheckUtil.check(v);
-                jumpActivity(HomeActivity.class);
-            });
-        }
-
-        // 左侧/底部导航：直播
-        View navLive = findViewById(R.id.navLive);
-        if (navLive != null) {
-            navLive.setOnClickListener(v -> {
-                FastClickCheckUtil.check(v);
-                jumpActivity(LivePlayActivity.class);
-            });
-        }
-
-        // 左侧/底部导航：我的（当前页，无需跳转）
+        // 底部/左侧导航由公共组件 MainNavBar 处理(app:navSelected="my"),页面无需再接
     }
 
     @Override
