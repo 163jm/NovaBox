@@ -15,8 +15,9 @@ import dev.jdtech.mpv.MPVLib;
 import xyz.doikki.videoplayer.player.AbstractPlayer;
 
 /**
- * libmpv 播放内核，支持硬解(hwdec=auto/mediacodec)与软解(hwdec=no)。
- * 对接 Doikki VideoView 的 AbstractPlayer 接口。
+ * libmpv 播放内核（适配 dev.jdtech.mpv:libmpv:0.5.1 静态 API）。
+ * 硬解: hwdec=auto；软解: hwdec=no。
+ * 对接 Doikki VideoView 的 AbstractPlayer。
  */
 public class MpvMediaPlayer extends AbstractPlayer implements MPVLib.EventObserver {
 
@@ -24,7 +25,7 @@ public class MpvMediaPlayer extends AbstractPlayer implements MPVLib.EventObserv
     private final boolean mHardwareDecode;
     private final Handler mMainHandler = new Handler(Looper.getMainLooper());
 
-    private MPVLib mMpv;
+    private boolean mInited;
     private Surface mSurface;
     private String mDataSource;
     private Map<String, String> mHeaders;
@@ -45,81 +46,86 @@ public class MpvMediaPlayer extends AbstractPlayer implements MPVLib.EventObserv
     @Override
     public void initPlayer() {
         try {
-            mMpv = MPVLib.create(mAppContext);
-            if (mMpv == null) {
-                LOG.i("echo-mpv-create-failed");
-                notifyError(PlayerEventListener.ERROR_TYPE_CODEC);
-                return;
-            }
-            mMpv.setOptionString("config", "no");
-            mMpv.setOptionString("terminal", "no");
-            mMpv.setOptionString("msg-level", "all=warn");
-            mMpv.setOptionString("idle", "yes");
-            mMpv.setOptionString("keep-open", "yes");
-            mMpv.setOptionString("force-window", "no");
-            mMpv.setOptionString("gpu-context", "android");
-            mMpv.setOptionString("opengl-es", "yes");
-            mMpv.setOptionString("hwdec", mHardwareDecode ? "auto" : "no");
-            mMpv.setOptionString("hwdec-codecs", "all");
-            mMpv.setOptionString("ao", "audiotrack");
-            mMpv.setOptionString("vd-lavc-o", "skip_frame=nonref");
-            mMpv.setOptionString("cache", "yes");
-            mMpv.setOptionString("demuxer-max-bytes", "64MiB");
-            mMpv.setOptionString("demuxer-max-back-bytes", "32MiB");
-            mMpv.setOptionString("network-timeout", "20");
-            mMpv.setOptionString("tls-verify", "no");
-            mMpv.setOptionString("ytdl", "no");
-            mMpv.setOptionString("sub-auto", "fuzzy");
-            mMpv.setOptionString("vo", "gpu");
-            mMpv.init();
-            mMpv.addObserver(this);
-            mMpv.observeProperty("time-pos", MPVLib.MpvFormat.MPV_FORMAT_DOUBLE);
-            mMpv.observeProperty("duration", MPVLib.MpvFormat.MPV_FORMAT_DOUBLE);
-            mMpv.observeProperty("pause", MPVLib.MpvFormat.MPV_FORMAT_FLAG);
-            mMpv.observeProperty("paused-for-cache", MPVLib.MpvFormat.MPV_FORMAT_FLAG);
-            mMpv.observeProperty("eof-reached", MPVLib.MpvFormat.MPV_FORMAT_FLAG);
-            mMpv.observeProperty("video-params/w", MPVLib.MpvFormat.MPV_FORMAT_INT64);
-            mMpv.observeProperty("video-params/h", MPVLib.MpvFormat.MPV_FORMAT_INT64);
-            mMpv.observeProperty("track-list/count", MPVLib.MpvFormat.MPV_FORMAT_INT64);
+            // 0.5.1 为静态全局实例：create → setOption → init
+            MPVLib.create(mAppContext);
+            MPVLib.setOptionString("config", "no");
+            MPVLib.setOptionString("terminal", "no");
+            MPVLib.setOptionString("msg-level", "all=warn");
+            MPVLib.setOptionString("idle", "yes");
+            MPVLib.setOptionString("keep-open", "yes");
+            MPVLib.setOptionString("force-window", "no");
+            MPVLib.setOptionString("gpu-context", "android");
+            MPVLib.setOptionString("opengl-es", "yes");
+            MPVLib.setOptionString("hwdec", mHardwareDecode ? "auto" : "no");
+            MPVLib.setOptionString("hwdec-codecs", "all");
+            MPVLib.setOptionString("ao", "audiotrack");
+            MPVLib.setOptionString("vd-lavc-o", "skip_frame=nonref");
+            MPVLib.setOptionString("cache", "yes");
+            MPVLib.setOptionString("demuxer-max-bytes", "64MiB");
+            MPVLib.setOptionString("demuxer-max-back-bytes", "32MiB");
+            MPVLib.setOptionString("network-timeout", "20");
+            MPVLib.setOptionString("tls-verify", "no");
+            MPVLib.setOptionString("ytdl", "no");
+            MPVLib.setOptionString("sub-auto", "fuzzy");
+            MPVLib.setOptionString("vo", "gpu");
+            MPVLib.init();
+            MPVLib.addObserver(this);
+            MPVLib.observeProperty("time-pos", MPVLib.MPV_FORMAT_DOUBLE);
+            MPVLib.observeProperty("duration", MPVLib.MPV_FORMAT_DOUBLE);
+            MPVLib.observeProperty("pause", MPVLib.MPV_FORMAT_FLAG);
+            MPVLib.observeProperty("paused-for-cache", MPVLib.MPV_FORMAT_FLAG);
+            MPVLib.observeProperty("eof-reached", MPVLib.MPV_FORMAT_FLAG);
+            MPVLib.observeProperty("video-params/w", MPVLib.MPV_FORMAT_INT64);
+            MPVLib.observeProperty("video-params/h", MPVLib.MPV_FORMAT_INT64);
+            MPVLib.observeProperty("track-list/count", MPVLib.MPV_FORMAT_INT64);
+            mInited = true;
             LOG.i("echo-mpv-init hardware=" + mHardwareDecode);
         } catch (Throwable t) {
             LOG.i("echo-mpv-init-error:" + t.getMessage());
+            mInited = false;
             notifyError(PlayerEventListener.ERROR_TYPE_CODEC);
         }
     }
 
     @Override
     public void setOptions() {
+        // options applied in initPlayer before native init
     }
 
     @Override
     public void setDataSource(String path, Map<String, String> headers) {
         mDataSource = path;
         mHeaders = headers;
-        mIsPrepared = false;
-        mHasVideoSize = false;
-        mBufferedPercent = 0;
     }
 
     @Override
     public void setDataSource(AssetFileDescriptor fd) {
-        notifyError(PlayerEventListener.ERROR_TYPE_CODEC);
+        if (fd != null) {
+            mDataSource = "fd://" + fd.getParcelFileDescriptor().getFd();
+        }
     }
 
     @Override
     public void prepareAsync() {
-        if (mMpv == null || mDataSource == null) {
+        if (!mInited || mDataSource == null) {
             notifyError(PlayerEventListener.ERROR_TYPE_CODEC);
             return;
         }
         try {
-            applyHeaders();
-            if (mSurface != null) {
-                mMpv.attachSurface(mSurface);
-                mMpv.setPropertyString("force-window", "yes");
+            if (mHeaders != null && !mHeaders.isEmpty()) {
+                StringBuilder hb = new StringBuilder();
+                for (Map.Entry<String, String> e : mHeaders.entrySet()) {
+                    if (hb.length() > 0) hb.append("\r\n");
+                    hb.append(e.getKey()).append(": ").append(e.getValue());
+                }
+                MPVLib.setOptionString("http-header-fields", hb.toString());
             }
-            mMpv.command(new String[]{"loadfile", mDataSource, "replace"});
-            mMpv.setPropertyBoolean("pause", false);
+            if (mSurface != null) {
+                MPVLib.attachSurface(mSurface);
+                MPVLib.setPropertyString("force-window", "yes");
+            }
+            MPVLib.command(new String[]{"loadfile", mDataSource, "replace"});
+            MPVLib.setPropertyBoolean("pause", false);
             mIsPlaying = true;
         } catch (Throwable t) {
             LOG.i("echo-mpv-prepare-error:" + t.getMessage());
@@ -127,31 +133,11 @@ public class MpvMediaPlayer extends AbstractPlayer implements MPVLib.EventObserv
         }
     }
 
-    private void applyHeaders() {
-        if (mHeaders == null || mHeaders.isEmpty() || mMpv == null) return;
-        StringBuilder sb = new StringBuilder();
-        for (Map.Entry<String, String> e : mHeaders.entrySet()) {
-            if (e.getKey() == null || e.getValue() == null) continue;
-            if (sb.length() > 0) sb.append("\r\n");
-            sb.append(e.getKey()).append(": ").append(e.getValue());
-        }
-        if (sb.length() > 0) {
-            mMpv.setOptionString("http-header-fields", sb.toString());
-            mMpv.setPropertyString("http-header-fields", sb.toString());
-        }
-        String ua = mHeaders.get("User-Agent");
-        if (ua == null) ua = mHeaders.get("user-agent");
-        if (ua != null) {
-            mMpv.setOptionString("user-agent", ua);
-            mMpv.setPropertyString("user-agent", ua);
-        }
-    }
-
     @Override
     public void start() {
-        if (mMpv == null) return;
+        if (!mInited) return;
         try {
-            mMpv.setPropertyBoolean("pause", false);
+            MPVLib.setPropertyBoolean("pause", false);
             mIsPlaying = true;
         } catch (Throwable ignored) {
         }
@@ -159,9 +145,9 @@ public class MpvMediaPlayer extends AbstractPlayer implements MPVLib.EventObserv
 
     @Override
     public void pause() {
-        if (mMpv == null) return;
+        if (!mInited) return;
         try {
-            mMpv.setPropertyBoolean("pause", true);
+            MPVLib.setPropertyBoolean("pause", true);
             mIsPlaying = false;
         } catch (Throwable ignored) {
         }
@@ -169,9 +155,9 @@ public class MpvMediaPlayer extends AbstractPlayer implements MPVLib.EventObserv
 
     @Override
     public void stop() {
-        if (mMpv == null) return;
+        if (!mInited) return;
         try {
-            mMpv.command(new String[]{"stop"});
+            MPVLib.command(new String[]{"stop"});
             mIsPlaying = false;
             mIsPrepared = false;
         } catch (Throwable ignored) {
@@ -180,11 +166,19 @@ public class MpvMediaPlayer extends AbstractPlayer implements MPVLib.EventObserv
 
     @Override
     public void reset() {
-        stop();
-        mDataSource = null;
-        mHeaders = null;
-        mBufferedPercent = 0;
+        mIsPlaying = false;
+        mIsPrepared = false;
+        mIsBuffering = false;
         mHasVideoSize = false;
+        mBufferedPercent = 0;
+        mVideoWidth = 0;
+        mVideoHeight = 0;
+        if (mInited) {
+            try {
+                MPVLib.command(new String[]{"stop"});
+            } catch (Throwable ignored) {
+            }
+        }
     }
 
     @Override
@@ -194,9 +188,9 @@ public class MpvMediaPlayer extends AbstractPlayer implements MPVLib.EventObserv
 
     @Override
     public void seekTo(long time) {
-        if (mMpv == null) return;
+        if (!mInited) return;
         try {
-            mMpv.command(new String[]{"seek", String.valueOf(time / 1000.0), "absolute"});
+            MPVLib.command(new String[]{"seek", String.valueOf(time / 1000.0), "absolute"});
         } catch (Throwable ignored) {
         }
     }
@@ -205,15 +199,15 @@ public class MpvMediaPlayer extends AbstractPlayer implements MPVLib.EventObserv
     public void release() {
         mIsPlaying = false;
         mIsPrepared = false;
-        if (mMpv != null) {
+        if (mInited) {
             try {
-                mMpv.removeObserver(this);
-                mMpv.detachSurface();
-                mMpv.destroy();
+                MPVLib.removeObserver(this);
+                MPVLib.detachSurface();
+                MPVLib.destroy();
             } catch (Throwable t) {
                 LOG.i("echo-mpv-release-error:" + t.getMessage());
             }
-            mMpv = null;
+            mInited = false;
         }
         mSurface = null;
         mMainHandler.removeCallbacksAndMessages(null);
@@ -221,9 +215,9 @@ public class MpvMediaPlayer extends AbstractPlayer implements MPVLib.EventObserv
 
     @Override
     public long getCurrentPosition() {
-        if (mMpv == null) return 0;
+        if (!mInited) return 0;
         try {
-            Double pos = mMpv.getPropertyDouble("time-pos");
+            Double pos = MPVLib.getPropertyDouble("time-pos");
             if (pos != null) return (long) (pos * 1000);
         } catch (Throwable ignored) {
         }
@@ -232,9 +226,9 @@ public class MpvMediaPlayer extends AbstractPlayer implements MPVLib.EventObserv
 
     @Override
     public long getDuration() {
-        if (mMpv == null) return 0;
+        if (!mInited) return 0;
         try {
-            Double dur = mMpv.getPropertyDouble("duration");
+            Double dur = MPVLib.getPropertyDouble("duration");
             if (dur != null) return (long) (dur * 1000);
         } catch (Throwable ignored) {
         }
@@ -249,15 +243,14 @@ public class MpvMediaPlayer extends AbstractPlayer implements MPVLib.EventObserv
     @Override
     public void setSurface(Surface surface) {
         mSurface = surface;
-        if (mMpv == null) return;
+        if (!mInited) return;
         try {
             if (surface != null) {
-                mMpv.attachSurface(surface);
-                mMpv.setPropertyInt("android-surface-size", 0);
-                mMpv.setPropertyString("force-window", "yes");
+                MPVLib.attachSurface(surface);
+                MPVLib.setPropertyString("force-window", "yes");
             } else {
-                mMpv.detachSurface();
-                mMpv.setPropertyString("force-window", "no");
+                MPVLib.detachSurface();
+                MPVLib.setPropertyString("force-window", "no");
             }
         } catch (Throwable t) {
             LOG.i("echo-mpv-setSurface-error:" + t.getMessage());
@@ -271,19 +264,19 @@ public class MpvMediaPlayer extends AbstractPlayer implements MPVLib.EventObserv
 
     @Override
     public void setVolume(float v1, float v2) {
-        if (mMpv == null) return;
+        if (!mInited) return;
         try {
             double vol = Math.max(0, Math.min(100, ((v1 + v2) / 2.0) * 100.0));
-            mMpv.setPropertyDouble("volume", vol);
+            MPVLib.setPropertyDouble("volume", vol);
         } catch (Throwable ignored) {
         }
     }
 
     @Override
     public void setLooping(boolean isLooping) {
-        if (mMpv == null) return;
+        if (!mInited) return;
         try {
-            mMpv.setPropertyString("loop-file", isLooping ? "inf" : "no");
+            MPVLib.setPropertyString("loop-file", isLooping ? "inf" : "no");
         } catch (Throwable ignored) {
         }
     }
@@ -291,22 +284,15 @@ public class MpvMediaPlayer extends AbstractPlayer implements MPVLib.EventObserv
     @Override
     public void setSpeed(float speed) {
         mSpeed = speed;
-        if (mMpv == null) return;
+        if (!mInited) return;
         try {
-            mMpv.setPropertyDouble("speed", speed);
+            MPVLib.setPropertyDouble("speed", (double) speed);
         } catch (Throwable ignored) {
         }
     }
 
     @Override
     public float getSpeed() {
-        if (mMpv != null) {
-            try {
-                Double s = mMpv.getPropertyDouble("speed");
-                if (s != null) return s.floatValue();
-            } catch (Throwable ignored) {
-            }
-        }
         return mSpeed;
     }
 
@@ -318,10 +304,12 @@ public class MpvMediaPlayer extends AbstractPlayer implements MPVLib.EventObserv
     private void notifyError(int type) {
         mMainHandler.post(() -> {
             if (mPlayerEventListener != null) {
-                mPlayerEventListener.onError(type);
+                mPlayerEventListener.onError();
             }
         });
     }
+
+    // ---------- MPVLib.EventObserver (0.5.1) ----------
 
     @Override
     public void eventProperty(String property) {
@@ -340,13 +328,14 @@ public class MpvMediaPlayer extends AbstractPlayer implements MPVLib.EventObserv
 
     @Override
     public void eventProperty(String property, double value) {
+        // time-pos / duration 由 getCurrentPosition/getDuration 按需读取
     }
 
     @Override
     public void eventProperty(String property, boolean value) {
+        if (mPlayerEventListener == null) return;
         if ("paused-for-cache".equals(property)) {
             mMainHandler.post(() -> {
-                if (mPlayerEventListener == null) return;
                 if (value && !mIsBuffering) {
                     mIsBuffering = true;
                     mPlayerEventListener.onInfo(MEDIA_INFO_BUFFERING_START, 0);
@@ -372,8 +361,8 @@ public class MpvMediaPlayer extends AbstractPlayer implements MPVLib.EventObserv
     @Override
     public void event(int eventId) {
         switch (eventId) {
-            case MPVLib.MpvEvent.MPV_EVENT_FILE_LOADED:
-            case MPVLib.MpvEvent.MPV_EVENT_START_FILE:
+            case MPVLib.MPV_EVENT_FILE_LOADED:
+            case MPVLib.MPV_EVENT_START_FILE:
                 if (!mIsPrepared) {
                     mIsPrepared = true;
                     mMainHandler.post(() -> {
@@ -384,21 +373,19 @@ public class MpvMediaPlayer extends AbstractPlayer implements MPVLib.EventObserv
                     });
                 }
                 break;
-            case MPVLib.MpvEvent.MPV_EVENT_END_FILE:
+            case MPVLib.MPV_EVENT_END_FILE:
                 break;
-            case MPVLib.MpvEvent.MPV_EVENT_VIDEO_RECONFIG:
+            case MPVLib.MPV_EVENT_VIDEO_RECONFIG:
                 try {
-                    if (mMpv != null) {
-                        Integer w = mMpv.getPropertyInt("width");
-                        Integer h = mMpv.getPropertyInt("height");
-                        if (w != null) mVideoWidth = w;
-                        if (h != null) mVideoHeight = h;
-                        maybeNotifyVideoSize();
-                    }
+                    Integer w = MPVLib.getPropertyInt("width");
+                    Integer h = MPVLib.getPropertyInt("height");
+                    if (w != null) mVideoWidth = w;
+                    if (h != null) mVideoHeight = h;
+                    maybeNotifyVideoSize();
                 } catch (Throwable ignored) {
                 }
                 break;
-            case MPVLib.MpvEvent.MPV_EVENT_SHUTDOWN:
+            case MPVLib.MPV_EVENT_SHUTDOWN:
                 break;
             default:
                 break;
