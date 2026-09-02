@@ -15,7 +15,6 @@ import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import androidx.core.content.ContextCompat;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -43,45 +42,23 @@ import com.mobile.novabox.util.FastClickCheckUtil;
 import com.mobile.novabox.util.HawkConfig;
 import com.mobile.novabox.util.LOG;
 import com.mobile.novabox.util.PlayerHelper;
-import com.mobile.novabox.util.HistoryHelper;
 import com.mobile.novabox.util.live.TxtSubscribe;
-import com.mobile.novabox.util.urlhttp.CallBackUtil;
-import com.mobile.novabox.util.urlhttp.UrlHttpUtil;
 import com.google.gson.JsonArray;
-import org.apache.commons.lang3.StringUtils;
 
 import com.google.gson.JsonObject;
 import com.lzy.okgo.OkGo;
 import com.lzy.okgo.callback.AbsCallback;
 import com.lzy.okgo.model.Response;
 import com.orhanobut.hawk.Hawk;
-import com.squareup.picasso.Picasso;
 
-import org.json.JSONArray;
-import org.json.JSONException;
-import org.json.JSONObject;
-import org.w3c.dom.Document;
-import org.w3c.dom.Element;
-import org.w3c.dom.Node;
-import org.w3c.dom.NodeList;
-import org.xml.sax.InputSource;
-
-import java.io.StringReader;
-import java.net.URLEncoder;
-import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Calendar;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Hashtable;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
-import java.util.TimeZone;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -89,11 +66,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-
-import javax.xml.parsers.DocumentBuilder;
-import javax.xml.parsers.DocumentBuilderFactory;
 
 import xyz.doikki.videoplayer.exo.ExoMediaSourceHelper;
 import xyz.doikki.videoplayer.player.AbstractPlayer;
@@ -109,7 +81,6 @@ public class LiveFragment extends BaseLazyFragment {
     private VideoView<xyz.doikki.videoplayer.player.AbstractPlayer> mVideoView;
     private View switchChannelSnapshotOverlay;
     private ImageView switchChannelSnapshotImage;
-    private TextView tvChannelInfo;
     private TextView tvTime;
     private TextView tvNetSpeed;
     private TextView tvResolution;
@@ -138,9 +109,6 @@ public class LiveFragment extends BaseLazyFragment {
 
     private List<LiveChannelGroup> liveChannelGroupList = new ArrayList<>();
     private int currentLiveChannelIndex = -1;
-    // 记录上一次刷新三列列表时使用的分组下标与频道列表，避免重复/无谓刷新
-    private int mLastChannelGroupIndex = -1;
-    private List<LiveChannelItem> mLastChannelList = new ArrayList<>();
     private int currentLiveLookBackIndex = -1;
     private int currentLiveChangeSourceTimes = 0;
     /** 本轮已尝试过的播放内核(0=EXO硬解 1=EXO软解 2=IJK硬解 3=IJK软解),失败时按序切换;播放成功/换源/换频道时清空 */
@@ -152,15 +120,12 @@ public class LiveFragment extends BaseLazyFragment {
     private LivePlayerManager livePlayerManager = new LivePlayerManager();
     private ArrayList<Integer> channelGroupPasswordConfirmed = new ArrayList<>();
 
-//EPG   by 龍
     private static LiveChannelItem  channel_Name = null;
     private CountDownTimer countDownTimer;
     private View ll_right_top_loading;
     private View ll_right_top_huikan;
-    private TextView tv_right_top_tipnetspeed;
     private TextView tv_right_top_channel_name;
     private TextView tv_right_top_epg_name;
-    private TextView tv_right_top_type;
     private View iv_circle_bg;
     private ImageView iv_back_bg;
 
@@ -202,7 +167,6 @@ public class LiveFragment extends BaseLazyFragment {
         mLiveChannelView = findViewById(R.id.mChannelGridView);
         mSettingGroupView = findViewById(R.id.mSettingGroupView);
         mSettingItemView = findViewById(R.id.mSettingItemView);
-        tvChannelInfo = findViewById(R.id.tvChannel);
         tvTime = findViewById(R.id.tvTime);
         tvNetSpeed = findViewById(R.id.tvNetSpeed);
         tvResolution = findViewById(R.id.tvResolution);
@@ -467,11 +431,9 @@ public class LiveFragment extends BaseLazyFragment {
 
     private JsonObject catchup=null;
     private Boolean hasCatchup=false;
-    private String logoUrl=null;
     private void initLiveObj(){
         catchup = null;
         hasCatchup = false;
-        logoUrl = null;
         int position=ApiConfig.getLiveGroupIndex();
         JsonArray live_groups=Hawk.get(HawkConfig.LIVE_GROUP_LIST,new JsonArray());
         if (live_groups == null || live_groups.size() == 0 || position < 0 || position >= live_groups.size()) {
@@ -484,9 +446,6 @@ public class LiveFragment extends BaseLazyFragment {
             catchup = livesOBJ.getAsJsonObject("catchup");
             LOG.i("echo-catchup :"+ catchup.toString());
             hasCatchup=true;
-        }
-        if(livesOBJ.has("logo")){
-            logoUrl = livesOBJ.get("logo").getAsString();
         }
         if(type.equals("3")){
             String py_jar="";
@@ -530,18 +489,6 @@ public class LiveFragment extends BaseLazyFragment {
 
     private boolean currentChannelHasCatchup() {
         return currentLiveChannelItem != null && currentLiveChannelItem.hasCatchup();
-    }
-
-    private JsonObject currentCatchup() {
-        if (currentChannelHasCatchup()) return currentLiveChannelItem.getChannelCatchup();
-        return catchup;
-    }
-
-    private boolean hasCurrentCatchupTemplate() {
-        JsonObject obj = currentCatchup();
-        return obj != null && obj.has("source") && obj.has("replace")
-                && !obj.get("source").getAsString().isEmpty()
-                && !obj.get("replace").getAsString().isEmpty();
     }
 
     private void showSwitchChannelSnapshot() {
@@ -631,18 +578,6 @@ public class LiveFragment extends BaseLazyFragment {
             showResolutionAfterChannelSwitch();
         }
         return true;
-    }
-
-    private void playNext() {
-        if (!isCurrentLiveChannelValid()) return;
-        Integer[] groupChannelIndex = getNextChannel(1);
-        playChannel(groupChannelIndex[0], groupChannelIndex[1], false);
-    }
-
-    private void playPrevious() {
-        if (!isCurrentLiveChannelValid()) return;
-        Integer[] groupChannelIndex = getNextChannel(-1);
-        playChannel(groupChannelIndex[0], groupChannelIndex[1], false);
     }
 
     public void playPreSource() {
@@ -790,7 +725,6 @@ public class LiveFragment extends BaseLazyFragment {
     }
 
     private void selectChannelGroup(int groupIndex, boolean focus, int liveChannelIndex) {
-        mLastChannelGroupIndex=groupIndex;
         if (focus) {
             liveChannelGroupAdapter.setFocusedGroupIndex(groupIndex);
             liveChannelItemAdapter.setFocusedChannelIndex(-1);
@@ -1639,8 +1573,6 @@ public class LiveFragment extends BaseLazyFragment {
         // 刷新频道列表数据
         List<LiveChannelItem> channels = getLiveChannels(currentChannelGroupIndex);
         liveChannelItemAdapter.setNewData(channels);
-        mLastChannelGroupIndex = currentChannelGroupIndex;
-        mLastChannelList = new ArrayList<>(channels);
         // 高亮分组
         liveChannelGroupAdapter.setSelectedGroupIndex(currentChannelGroupIndex);
         liveChannelGroupAdapter.setFocusedGroupIndex(-1);
@@ -1664,32 +1596,6 @@ public class LiveFragment extends BaseLazyFragment {
             mLiveChannelView.scrollToPosition(currentLiveChannelIndex);
     }
 
-
-    private boolean hasCurrentLiveChannelSource() {
-        return currentLiveChannelItem != null
-                && currentLiveChannelItem.getChannelUrls() != null
-                && currentLiveChannelItem.getSourceNum() > 0
-                && currentLiveChannelItem.getSourceIndex() >= 0
-                && currentLiveChannelItem.getSourceIndex() < currentLiveChannelItem.getChannelUrls().size();
-    }
-
-    private int getDefaultSettingGroupIndex() {
-        if (hasCurrentLiveChannelSource()) return 0;
-        return liveSettingGroupList != null && liveSettingGroupList.size() > 5 ? 5 : 0;
-    }
-
-    private ArrayList<LiveSettingGroup> getVisibleLiveSettingGroupList() {
-        ArrayList<LiveSettingGroup> visibleGroups = new ArrayList<>();
-        if (liveSettingGroupList == null) return visibleGroups;
-        boolean showChannelOptions = hasCurrentLiveChannelSource();
-        for (LiveSettingGroup group : liveSettingGroupList) {
-            if (group == null) continue;
-            int groupIndex = group.getGroupIndex();
-            if (!showChannelOptions && groupIndex >= 0 && groupIndex <= 2) continue;
-            visibleGroups.add(group);
-        }
-        return visibleGroups;
-    }
 
     private void initLiveSettingGroupList() {
         liveSettingGroupList=ApiConfig.get().getLiveSettingGroupList();
@@ -1984,10 +1890,6 @@ public class LiveFragment extends BaseLazyFragment {
     /**
      * 当播放列表为空或加载失败时，设置一个默认的播放列表，保证播放界面不会崩溃
      */
-    private void clearLiveChannelList() {
-        clearLiveChannelList(true);
-    }
-
     private void clearLiveChannelList(boolean releasePlayer) {
         refreshingLiveChannelList = false;
         pendingLiveRefreshChannelName = null;

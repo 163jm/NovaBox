@@ -197,23 +197,9 @@
             </RelativeLayout>
 
             <!-- 隐藏兼容视图 -->
-            <TextView
-                android:id="@+id/tv_selected_channel"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:background="@android:color/transparent"
-                android:clickable="false"
-                android:focusable="false"
-                android:shadowColor="@color/color_1890FF"
-                android:shadowDx="2" android:shadowDy="2" android:shadowRadius="1"
-                android:textColor="@android:color/white"
-                android:textSize="48sp" android:textStyle="bold"
-                android:visibility="invisible" />
             <TextView android:id="@+id/tvResolution" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="@android:color/white" android:textSize="8sp" android:visibility="gone" tools:text="[1920x1080]" />
             <TextView android:id="@+id/tvNetSpeed" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="@android:color/white" android:textSize="8sp" android:visibility="gone" tools:text="968bps" android:layout_gravity="end|top" />
             <TextView android:id="@+id/tvTime" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="@android:color/white" android:textSize="8sp" android:visibility="gone" android:layout_gravity="end|top" />
-            <TextView android:id="@+id/tvChannel" android:layout_width="wrap_content" android:layout_height="wrap_content" android:background="@drawable/shape_live_channel_num" android:gravity="center" android:textColor="@android:color/white" android:textSize="10dp" android:textStyle="bold" android:visibility="gone" android:layout_gravity="end|top" />
-            <TextView android:id="@+id/tv_shownum" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_gravity="end|top" android:layout_margin="20dp" android:paddingTop="8dp"/>
         </FrameLayout>
 
         <!-- 信息栏：频道名 + 设置按钮 -->

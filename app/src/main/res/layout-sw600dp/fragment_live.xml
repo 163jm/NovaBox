@@ -156,15 +156,10 @@
                 <TextView android:id="@+id/tv_right_top_type" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_alignStart="@+id/tv_right_top_epg_name" android:layout_alignParentEnd="true" android:layout_alignParentBottom="true" android:layout_marginEnd="8dp" android:gravity="center" android:paddingStart="6dp" android:paddingBottom="4dp" android:singleLine="true" android:text="回看中" android:textColor="#FFFCFFFF" android:textSize="11sp" />
             </RelativeLayout>
 
-            <!-- 兼容隐藏视图 -->
-            <TextView android:id="@+id/tv_selected_channel" android:layout_width="wrap_content" android:layout_height="wrap_content" android:background="@android:color/transparent" android:clickable="false" android:focusable="false" android:textColor="@android:color/white" android:textSize="48sp" android:textStyle="bold" android:visibility="invisible" />
+            <!-- 隐藏兼容视图 -->
             <TextView android:id="@+id/tvResolution" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="@android:color/white" android:textSize="8sp" android:visibility="gone" />
             <TextView android:id="@+id/tvNetSpeed" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="@android:color/white" android:textSize="8sp" android:visibility="gone" android:layout_gravity="end|top" />
             <TextView android:id="@+id/tvTime" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="@android:color/white" android:textSize="8sp" android:visibility="gone" android:layout_gravity="end|top" />
-            <TextView android:id="@+id/tvChannel" android:layout_width="wrap_content" android:layout_height="wrap_content" android:background="@drawable/shape_live_channel_num" android:gravity="center" android:textColor="@android:color/white" android:textSize="10dp" android:textStyle="bold" android:visibility="gone" android:layout_gravity="end|top" />
-            <TextView android:id="@+id/tv_shownum" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_gravity="end|top" android:layout_margin="20dp" android:paddingTop="8dp"/>
-            <TextView android:id="@+id/tv_showTime" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_gravity="end|top" android:layout_margin="20dp" android:paddingTop="8dp"/>
-            <LinearLayout android:layout_gravity="start|top" android:orientation="vertical" android:id="@+id/ll_loading" android:layout_width="wrap_content" android:layout_height="wrap_content" />
         </FrameLayout>
 
         <!-- ══════════════════════════════
@@ -285,60 +280,6 @@
                 <View android:layout_width="1dp" android:layout_height="match_parent" android:background="#FFE0E0E0" android:layout_marginStart="4dp" android:layout_marginEnd="4dp" />
                 <androidx.recyclerview.widget.RecyclerView android:id="@+id/mSettingItemView" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:background="#FFFAFAFA" android:padding="4dp" android:scrollbars="none" />
             </LinearLayout>
-        </LinearLayout>
-    </FrameLayout>
-
-    <!-- 兼容隐藏视图区域（与手机版保持 id 一致） -->
-    <FrameLayout android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone">
-        <LinearLayout android:id="@+id/tvLeftChannnelListLayout" android:layout_width="wrap_content" android:layout_height="match_parent" android:orientation="horizontal" android:visibility="invisible" />
-        <LinearLayout android:id="@+id/tvRightSettingLayout" android:layout_width="wrap_content" android:layout_height="match_parent" android:orientation="horizontal" android:visibility="invisible" />
-        <RelativeLayout android:id="@+id/ll_epg" android:layout_width="match_parent" android:layout_height="wrap_content">
-            <View android:id="@+id/view_bg" android:layout_width="wrap_content" android:layout_height="40dp" android:layout_alignParentStart="true" android:layout_alignParentBottom="true" />
-            <LinearLayout android:id="@+id/channelinfo" android:layout_width="120dp" android:layout_height="match_parent" android:orientation="vertical">
-                <TextView android:id="@+id/tv_channel_bottom_number" android:layout_width="wrap_content" android:layout_height="wrap_content" android:visibility="gone" android:textColor="@color/color_FFFFFF" android:textSize="14sp" />
-                <FrameLayout android:layout_width="80dp" android:layout_height="40dp">
-                    <FrameLayout android:id="@+id/live_icon_null_bg" android:layout_width="60dp" android:layout_height="40dp" android:layout_gravity="center" />
-                    <TextView android:id="@+id/live_icon_null_text" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_gravity="center" android:textColor="@android:color/white" android:textSize="14sp" />
-                    <ImageView android:id="@+id/img_live_icon" android:layout_width="80dp" android:layout_height="40dp" android:layout_gravity="center" android:scaleType="centerInside" />
-                </FrameLayout>
-                <com.mobile.novabox.ui.tv.widget.MarqueeTextView android:id="@+id/tv_channel_bar_name" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="@color/color_FFFFFF" android:textSize="12sp" />
-            </LinearLayout>
-            <TextView android:id="@+id/tv_current_program" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="@color/color_FFFFFF" android:textSize="10sp" android:layout_toEndOf="@+id/channelinfo" />
-            <com.mobile.novabox.ui.tv.widget.MarqueeTextView android:id="@+id/tv_current_program_time" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="@color/color_FFFFFF" android:textSize="10sp" android:layout_toEndOf="@+id/tv_current_program" android:layout_alignTop="@+id/tv_current_program" />
-            <com.mobile.novabox.ui.tv.widget.MarqueeTextView android:id="@+id/tv_current_program_name" android:layout_width="100dp" android:layout_height="wrap_content" android:textColor="@color/color_FFFFFF" android:textSize="10sp" android:layout_alignParentEnd="true" android:layout_alignTop="@+id/tv_current_program" />
-            <View android:id="@+id/view_line" android:layout_width="wrap_content" android:layout_height="1px" android:background="@color/color_FFFFFF" android:layout_alignStart="@+id/tv_current_program" android:layout_alignBottom="@+id/tv_current_program_name" />
-            <TextView android:id="@+id/tv_next_program" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="@color/color_FFFFFF" android:textSize="10sp" android:layout_alignStart="@+id/tv_current_program" android:layout_alignParentBottom="true" />
-            <com.mobile.novabox.ui.tv.widget.MarqueeTextView android:id="@+id/tv_next_program_time" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="@color/color_FFFFFF" android:textSize="10sp" android:layout_toEndOf="@+id/tv_next_program" android:layout_alignTop="@+id/tv_next_program" />
-            <com.mobile.novabox.ui.tv.widget.MarqueeTextView android:id="@+id/tv_next_program_name" android:layout_width="100dp" android:layout_height="wrap_content" android:textColor="@color/color_FFFFFF" android:textSize="10sp" android:layout_alignParentEnd="true" android:layout_alignTop="@+id/tv_next_program" />
-            <TextView android:id="@+id/tv_source" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="@color/color_FFFFFF" android:textSize="10sp" android:layout_alignParentEnd="true" android:layout_alignParentTop="true" />
-        </RelativeLayout>
-        <RelativeLayout android:id="@+id/backcontroller" android:layout_width="match_parent" android:layout_height="wrap_content" android:visibility="gone">
-            <LinearLayout android:id="@+id/ll_play" android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center" android:orientation="vertical" android:visibility="gone">
-                <ImageView android:id="@+id/iv_play" android:layout_width="60sp" android:layout_height="60sp" android:visibility="gone" android:background="@drawable/vod_pause" />
-            </LinearLayout>
-            <LinearLayout android:id="@+id/progress_container" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_below="@id/ll_play" android:layout_alignParentBottom="true" android:gravity="center" android:orientation="horizontal">
-                <ImageView android:id="@+id/iv_playpause" android:layout_width="30dp" android:layout_height="30dp" android:background="@drawable/vod_pause" />
-                <TextView android:id="@+id/tv_currentpos" android:layout_width="50dp" android:layout_height="wrap_content" android:text="@string/_00_00_00" android:textColor="#fff" android:singleLine="true" android:gravity="end" />
-                <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1">
-                    <SeekBar android:id="@+id/pb_progressbar" android:layout_width="match_parent" android:layout_height="30dp" android:max="100" android:progress="30" />
-                </LinearLayout>
-                <TextView android:id="@+id/tv_duration" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/_00_00_00" android:textColor="#fff" android:singleLine="true" />
-            </LinearLayout>
-        </RelativeLayout>
-        <LinearLayout android:id="@+id/divLoadEpg" android:layout_width="wrap_content" android:layout_height="wrap_content" android:orientation="vertical" android:visibility="gone">
-            <TextView android:id="@+id/tv_arrow" android:layout_width="20dp" android:layout_height="20dp" android:text="节 目" android:textColor="@color/color_FFFFFF" />
-            <ImageView android:id="@+id/iv_arrow" android:layout_width="20dp" android:layout_height="20dp" android:src="@drawable/scrollview" />
-            <TextView android:id="@+id/tv_arrow2" android:layout_width="20dp" android:layout_height="20dp" android:text="信 息" android:textColor="@color/color_FFFFFF" />
-        </LinearLayout>
-        <LinearLayout android:id="@+id/divLoadEpgleft" android:layout_width="wrap_content" android:layout_height="wrap_content" android:orientation="vertical" android:visibility="gone">
-            <TextView android:id="@+id/tv_arrow0" android:layout_width="20dp" android:layout_height="20dp" android:text="@string/_more_" android:textColor="@color/color_FFFFFF" />
-            <ImageView android:id="@+id/iv_arrow2" android:layout_width="20dp" android:layout_height="20dp" android:src="@drawable/scrollviewleft" />
-            <TextView android:id="@+id/tv_arrow3" android:layout_width="20dp" android:layout_height="20dp" android:text="节 目" android:textColor="@color/color_FFFFFF" />
-        </LinearLayout>
-        <LinearLayout android:id="@+id/divEPG" android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="horizontal" android:visibility="gone">
-            <androidx.recyclerview.widget.RecyclerView android:id="@+id/mEpgDateGridView" android:layout_width="60dp" android:layout_height="wrap_content" />
-            <androidx.recyclerview.widget.RecyclerView android:id="@+id/lv_epg" android:layout_width="match_parent" android:layout_height="wrap_content" />
-            <TextView android:id="@+id/txtNoEpg" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="暂无节目信息…" android:textColor="@color/color_FF0057" android:visibility="gone" />
         </LinearLayout>
     </FrameLayout>
 
