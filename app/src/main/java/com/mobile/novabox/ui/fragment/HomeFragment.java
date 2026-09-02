@@ -1,8 +1,6 @@
 package com.mobile.novabox.ui.fragment;
 
 import android.Manifest;
-import android.animation.AlphaAnimation;
-import android.animation.Animation;
 import android.annotation.SuppressLint;
 import android.app.ActivityManager;
 import android.content.Intent;
@@ -11,6 +9,8 @@ import android.os.Handler;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.animation.AccelerateInterpolator;
+import android.view.animation.AlphaAnimation;
+import android.view.animation.Animation;
 import android.widget.TextView;
 import android.widget.Toast;
 

@@ -1,5 +1,6 @@
 package com.mobile.novabox.ui.activity;
 
+import android.app.ActivityManager;
 import android.content.Intent;
 import android.content.res.Configuration;
 import android.os.Bundle;
