@@ -11,7 +11,7 @@ import androidx.annotation.NonNull;
 import com.mobile.novabox.R;
 
 /**
- * 播放器切换弹窗:4 档(EXO 硬/软、IJK 硬/软)。
+ * 播放器切换弹窗:6 档(EXO 硬/软、IJK 硬/软、MPV 硬/软)。
  * 会话级,不持久化(换视频恢复默认)。
  */
 public class PlayerSelectDialog extends Dialog {
@@ -33,7 +33,9 @@ public class PlayerSelectDialog extends Dialog {
                 {R.id.ll_player_exo_hard, R.id.iv_player_exo_hard, 0},
                 {R.id.ll_player_exo_soft, R.id.iv_player_exo_soft, 1},
                 {R.id.ll_player_ijk_hard, R.id.iv_player_ijk_hard, 2},
-                {R.id.ll_player_ijk_soft, R.id.iv_player_ijk_soft, 3}
+                {R.id.ll_player_ijk_soft, R.id.iv_player_ijk_soft, 3},
+                {R.id.ll_player_mpv_hard, R.id.iv_player_mpv_hard, 4},
+                {R.id.ll_player_mpv_soft, R.id.iv_player_mpv_soft, 5}
         };
         for (int[] row : rows) {
             android.view.View ll = findViewById(row[0]);
