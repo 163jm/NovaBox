@@ -1,6 +1,7 @@
 apply plugin: 'com.android.application'
 
 android {
+    namespace 'com.mobile.novabox'
     compileSdkVersion 34
 
     defaultConfig {
@@ -17,10 +18,17 @@ android {
         }
     }
 
-    packagingOptions {
-        exclude 'META-INF/DEPENDENCIES'
-        // cling-core/cling-support 2.1.2 都带 beans.xml(Jandex 描述),对齐 tvbox 排除
-        exclude 'META-INF/beans.xml'
+    packaging {
+        resources {
+            excludes += [
+                'META-INF/DEPENDENCIES',
+                // cling-core/cling-support 2.1.2 都带 beans.xml(Jandex 描述),对齐 tvbox 排除
+                'META-INF/beans.xml'
+            ]
+        }
+    }
+    buildFeatures {
+        buildConfig true
     }
 
     flavorDimensions "mode"
@@ -119,7 +127,7 @@ android {
         targetCompatibility JavaVersion.VERSION_1_8
     }
 
-    lintOptions {
+    lint {
         checkReleaseBuilds false
         abortOnError false
     }
