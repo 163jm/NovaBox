@@ -12,9 +12,11 @@ import com.mobile.novabox.util.AppManager;
 import com.mobile.novabox.util.EpgUtil;
 import com.mobile.novabox.util.FileUtils;
 import com.mobile.novabox.util.HawkConfig;
+import com.mobile.novabox.util.LOG;
 import com.mobile.novabox.util.OkGoHelper;
 import com.kingja.loadsir.core.LoadSir;
 import com.orhanobut.hawk.Hawk;
+import com.p2p.P2PClass;
 import com.whl.quickjs.android.QuickJSLoader;
 import com.github.catvod.crawler.JsLoader;
 
@@ -29,6 +31,7 @@ import me.jessyan.autosize.unit.Subunits;
 public class App extends MultiDexApplication {
     private static App instance;
 
+    private static P2PClass p;
     public static String burl;
     private static String dashData;
 
@@ -53,6 +56,7 @@ public class App extends MultiDexApplication {
                 .setSupportSP(false)
                 .setSupportSubunits(Subunits.MM);
         QuickJSLoader.init();
+        FileUtils.cleanPlayerCache();
     }
 
     private void initParams() {
@@ -107,6 +111,18 @@ public class App extends MultiDexApplication {
     }
     public VodInfo getVodInfo(){
         return this.vodInfo;
+    }
+
+    public static P2PClass getp2p() {
+        try {
+            if (p == null) {
+                p = new P2PClass(FileUtils.getExternalCachePath());
+            }
+            return p;
+        } catch (Exception e) {
+            LOG.e(e.toString());
+            return null;
+        }
     }
 
     public Activity getCurrentActivity() {

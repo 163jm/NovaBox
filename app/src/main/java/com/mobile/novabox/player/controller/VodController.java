@@ -38,6 +38,8 @@ import com.mobile.novabox.util.PlayerHelper;
 import com.mobile.novabox.util.PlayerSwitchUtil;
 import com.mobile.novabox.util.SubtitleHelper;
 import com.mobile.novabox.util.VideoParseRuler;
+import com.mobile.novabox.util.thunder.Jianpian;
+import com.mobile.novabox.util.thunder.Thunder;
 import com.lzy.okgo.OkGo;
 import com.lzy.okgo.callback.AbsCallback;
 import com.lzy.okgo.model.HttpHeaders;
@@ -1040,6 +1042,8 @@ public class VodController extends BaseController {
 
     public void stopOther()
     {
+        Thunder.stop(false);//停止磁力下载
+        Jianpian.finish();//停止p2p下载
         App.getInstance().setDashData(null);
     }
 }

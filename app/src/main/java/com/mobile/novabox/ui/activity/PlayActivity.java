@@ -74,6 +74,8 @@ import com.mobile.novabox.util.PlayerHelper;
 import com.mobile.novabox.util.VideoParseRuler;
 import com.mobile.novabox.util.XWalkUtils;
 import com.mobile.novabox.util.parser.SuperParse;
+import com.mobile.novabox.util.thunder.Jianpian;
+import com.mobile.novabox.util.thunder.Thunder;
 import com.mobile.novabox.viewmodel.SourceViewModel;
 import com.lzy.okgo.OkGo;
 import com.lzy.okgo.callback.AbsCallback;
@@ -1113,6 +1115,38 @@ public class PlayActivity extends BaseActivity {
                 mController.mSubtitleView.setVisibility(View.GONE);
             }catch (Throwable ignore) {
             }
+        }
+        if(Jianpian.isJpUrl(vs.url)){//荐片地址特殊判断
+            String jp_url= vs.url;
+            mController.showParse(false);
+            if(vs.url.startsWith("tvbox-xg:")){
+                playUrl(Jianpian.JPUrlDec(jp_url.substring(9)), null);
+            }else {
+                playUrl(Jianpian.JPUrlDec(jp_url), null);
+            }
+            return;
+        }
+        if (Thunder.play(vs.url, new Thunder.ThunderCallback() {
+            @Override
+            public void status(int code, String info) {
+                if (code < 0) {
+                    setTip(info, false, true);
+                } else {
+                    setTip(info, true, false);
+                }
+            }
+
+            @Override
+            public void list(Map<Integer, String> urlMap) {
+            }
+
+            @Override
+            public void play(String url) {
+                playUrl(url, null);
+            }
+        })) {
+            mController.showParse(false);
+            return;
         }
         sourceViewModel.getPlay(sourceKey, mVodInfo.playFlag, progressKey, vs.url, subtitleCacheKey);
     }

@@ -12,6 +12,7 @@ import androidx.lifecycle.ViewModel;
 
 import com.github.catvod.crawler.Spider;
 import com.mobile.novabox.api.ApiConfig;
+import com.mobile.novabox.base.App;
 import com.mobile.novabox.bean.AbsJson;
 import com.mobile.novabox.bean.AbsSortJson;
 import com.mobile.novabox.bean.AbsSortXml;
@@ -26,6 +27,7 @@ import com.mobile.novabox.util.FileUtils;
 import com.mobile.novabox.util.HawkConfig;
 import com.mobile.novabox.util.LOG;
 import com.mobile.novabox.util.MD5;
+import com.mobile.novabox.util.thunder.Thunder;
 import com.mobile.novabox.util.urlhttp.OkHttpUtil;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
@@ -1445,6 +1447,73 @@ public class SourceViewModel extends ViewModel {
         return data;
     }
 
+    public void checkThunder(AbsXml data, int index) {
+        boolean thunderParse = false;
+        if (data.movie != null && data.movie.videoList != null && data.movie.videoList.size() == 1) {
+            Movie.Video video = data.movie.videoList.get(0);
+            if (video != null && video.urlBean != null && video.urlBean.infoList != null) {
+                boolean hasThunder=false;
+                thunderLoop:
+                for (int idx=0;idx<video.urlBean.infoList.size();idx++) {
+                    Movie.Video.UrlBean.UrlInfo urlInfo = video.urlBean.infoList.get(idx);
+                    for (Movie.Video.UrlBean.UrlInfo.InfoBean infoBean : urlInfo.beanList) {
+                        if(Thunder.isSupportUrl(infoBean.url)){
+                            hasThunder=true;
+                            break thunderLoop;
+                        }
+                    }
+                }
+                if (hasThunder) {
+                    thunderParse = true;
+                    Thunder.parse(App.getInstance(), video.urlBean, new Thunder.ThunderCallback() {
+                        @Override
+                        public void status(int code, String info) {
+                            if (code >= 0) {
+                                LOG.i(info);
+                            } else {
+                                video.urlBean.infoList.get(0).beanList.get(0).name = info;
+                                detailResult.postValue(data);
+                            }
+                        }
+
+                        @Override
+                        public void list(Map<Integer, String> urlMap) {
+                            for (int key : urlMap.keySet()) {
+                                String playList=urlMap.get(key);
+                                video.urlBean.infoList.get(key).urls = playList;
+                                String[] str = playList.split("#");
+                                List<Movie.Video.UrlBean.UrlInfo.InfoBean> infoBeanList = new ArrayList<>();
+                                for (String s : str) {
+                                    if (s.contains("$")) {
+                                        String[] ss = s.split("\\$");
+
+                                        if (ss.length > 0) {
+                                            if (ss.length >= 2) {
+                                                infoBeanList.add(new Movie.Video.UrlBean.UrlInfo.InfoBean(ss[0], ss[1]));
+                                            } else {
+                                                infoBeanList.add(new Movie.Video.UrlBean.UrlInfo.InfoBean((infoBeanList.size() + 1) + "", ss[0]));
+                                            }
+                                        }
+                                    }
+                                }
+                                video.urlBean.infoList.get(key).beanList = infoBeanList;
+                            }
+                            detailResult.postValue(data);
+                        }
+
+                        @Override
+                        public void play(String url) {
+
+                        }
+                    });
+                }
+            }
+        }
+        if (!thunderParse && index==0) {
+            detailResult.postValue(data);
+        }
+    }
+
     private AbsXml xml(MutableLiveData<AbsXml> result, String xml, String sourceKey) {
         return xml(result, xml, sourceKey, "");
     }
@@ -1469,7 +1538,8 @@ public class SourceViewModel extends ViewModel {
                 EventBus.getDefault().post(new RefreshEvent(RefreshEvent.TYPE_QUICK_SEARCH_RESULT, data));
             } else if (result != null) {
                 if (result == detailResult) {
-                	data = checkPush(data);
+                    data = checkPush(data);
+                    checkThunder(data,0);
                     detailResult.postValue(data);
                 }else {
                     result.postValue(data);
@@ -1519,7 +1589,8 @@ public class SourceViewModel extends ViewModel {
                 EventBus.getDefault().post(new RefreshEvent(RefreshEvent.TYPE_QUICK_SEARCH_RESULT, data));
             } else if (result != null) {
                 if (result == detailResult) {
-                	data = checkPush(data);
+                    data = checkPush(data);
+                    checkThunder(data,0);
                     detailResult.postValue(data);
                 }else {
                     result.postValue(data);
