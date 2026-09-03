@@ -89,6 +89,12 @@ public class JarLoader {
             File cacheDir = new File(App.getInstance().getCacheDir().getAbsolutePath() + "/catvod_csp");
             if (!cacheDir.exists())
                 cacheDir.mkdirs();
+            // Android 14+：禁止从可写路径加载 dex，加载前将 jar 设为只读
+            File jarFile = new File(jar);
+            if (jarFile.exists()) {
+                //noinspection ResultOfMethodCallIgnored
+                jarFile.setReadOnly();
+            }
             final DexClassLoader classLoader = new DexClassLoader(jar, cacheDir.getAbsolutePath(), null, App.getInstance().getClassLoader());
             injectProxyPort(classLoader);
             injectProtectedClassLoader(classLoader);
@@ -347,6 +353,11 @@ public class JarLoader {
             return classLoaders.get(key);
         }
         File cache = new File(App.getInstance().getFilesDir().getAbsolutePath() + "/csp/" + key + ".jar");
+        File cacheParent = cache.getParentFile();
+        if (cacheParent != null && !cacheParent.exists()) {
+            //noinspection ResultOfMethodCallIgnored
+            cacheParent.mkdirs();
+        }
         if (!md5.isEmpty()) {
             if (cache.exists() && MD5.getFileMd5(cache).equalsIgnoreCase(md5)) {
                 if(loadClassLoader(cache.getAbsolutePath(), key)){
@@ -363,6 +374,11 @@ public class JarLoader {
             }
         }
         try {
+            // 更新 jar 前恢复可写，否则 setReadOnly 后无法覆盖
+            if (cache.exists()) {
+                //noinspection ResultOfMethodCallIgnored
+                cache.setWritable(true);
+            }
             Response response = OkGo.<File>get(jar).execute();
             assert response.body() != null;
             InputStream is = response.body().byteStream();
