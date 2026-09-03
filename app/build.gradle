@@ -206,7 +206,7 @@ dependencies {
     implementation 'org.brotli:dec:0.1.2'
 
     // libmpv (MPV硬解/软解内核)
-    implementation 'dev.jdtech.mpv:libmpv:0.5.1'
+    implementation 'dev.jdtech.mpv:libmpv:1.0.0'
     implementation 'org.jetbrains.kotlin:kotlin-stdlib:1.8.22'
 }
 
